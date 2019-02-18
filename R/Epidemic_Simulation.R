@@ -44,15 +44,16 @@ new_states = function(state, next_t_inf, infector, infected, contact_times){
 
 #' @func Epidemic_Simulation, simulates an epidemic
 #' @param N, size of the closed population
+#' @param a, Number of initial infectious individuals
 #' @param par_beta, parameters to be passed to the kernel in order to calculate infection process parameters
 #' @param par_gamma, parameters to be passed to functions concerning the infectious period distribution
 #' @param kernel, model for the infectious process of the epidemic
 
-Epidemic_Simulation <- function(N, par_gamma, par_beta, kernel){
+Epidemic_Simulation <- function(N, a, par_gamma, par_beta, kernel){
 
-  state <- c(1, rep(0, N - 1)) # Which state is an individual in (S = 0, I = 1, R = 2)
+  state <- c(rep(1, a), rep(0, N - a)) # Which state is an individual in (S = 0, I = 1, R = 2)
 
-  t_inf <- c(0, rep(NA, N - 1)) # Time at which an individual is infected.
+  t_inf <- c(rep(0, a), rep(NA, N - a)) # Time at which an individual is infected.
 
   inf_period <- rgamma(N, rate = par_gamma[1], shape = par_gamma[2]) # Period of time for which an individual is infected
 
@@ -71,8 +72,8 @@ Epidemic_Simulation <- function(N, par_gamma, par_beta, kernel){
 
   # Check if
   if(min(contact_times[1,]) == Inf){
-    return(list(N = N, final_size = final_size, t_inf = c(rep(0, 1), rep(NA, N - 1)),
-                t_rem = c(inf_period[1], rep(NA, N - 1))))
+    return(list(N = N, final_size = final_size, t_inf = c(rep(0, a), rep(Inf, N - 1)),
+                t_rem = c(inf_period[1:a], rep(Inf, N - 1))))
   }
 
   while(sum(state == 0) > 0 & sum(state == 1) > 0 & sum(state == 1) < N){
