@@ -54,9 +54,13 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
     print(time)
     print(old_time)
     # Recording Panel Data
-    if(old_time <= obs_times[i] & time >= obs_times[i] & i <= k){
+    #' Record which observation times have been passed
+
+    obs_times_passed = which(old_time <= obs_times & obs_times <= time)
+
+    if(length(obs_times_passed) > 0){
       # Record Panel
-      panel_data[[i]] = c(time = obs_times[i], n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+      panel_data[[obs_times_passed[1]]] = c(time = obs_times[obs_times_passed[1]], n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
 
       # Reset
       X_t0 = X
@@ -64,8 +68,9 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
       I_i = Y
       I_s = 0
 
-      # Look for next observation.
-      i = i + 1
+      for(i in obs_times_passed[-1]){
+        panel_data[[obs_times_passed[1]]] = c(time = obs_times[i], n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+      }
     }
 
     which_event = sample(c(0,1,2), size = 1, prob = c(X*Y*beta, I_s*gamma, I_i*gamma)/rate_next_event)
@@ -91,19 +96,11 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
     sim_data = rbind(sim_data, c(time, X, Y, Z))
 
   }
-
-  for(i in which(is.na(panel_data))){
-    # Record Panel
-    panel_data[[i]] = c(time = obs_times[i], n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
-
-    # Reset
-    X_t0 = X
-    Y_t0 = Y
-    I_i = Y
-    I_s = 0
-  }
   return(list(sim_data = sim_data, panel_data = panel_data))
 }
+
+
+
 
 
 
