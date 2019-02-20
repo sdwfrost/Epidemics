@@ -31,7 +31,7 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
     T_obs = c(0, T_obs)
   }
 
-  obs_times = seq(T_obs[1], T_obs[2], length = k)
+  obs_times = seq(T_obs[1], T_obs[2], length = k)[-1]
 
   #' Tracking Variables for Panel Data
   X_t0 = X
@@ -41,7 +41,7 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
 
   #' Data Storage
   sim_data = c(time, X, Y, Z)
-  panel_data = lapply(rep(NA, k), function(X) return(X))
+  panel_data = lapply(rep(NA, k - 1), function(X) return(X))
   #' Observation Counter (Corresponds to the current observation time we're looking out for)
   i = 1
 
@@ -51,8 +51,6 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
     time_to_next_event = rexp(1, rate_next_event)
     time = time + time_to_next_event
 
-    print(time)
-    print(old_time)
     # Recording Panel Data
     #' Record which observation times have been passed
 
@@ -60,7 +58,7 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
 
     if(length(obs_times_passed) > 0){
       # Record Panel
-      panel_data[[obs_times_passed[1]]] = c(time = obs_times[obs_times_passed[1]], n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+      panel_data[[obs_times_passed[1]]] = c(n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
 
       # Reset
       X_t0 = X
@@ -69,7 +67,7 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
       I_s = 0
 
       for(i in obs_times_passed[-1]){
-        panel_data[[obs_times_passed[1]]] = c(time = obs_times[i], n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+        panel_data[[i]] = c(n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
       }
     }
 
@@ -96,10 +94,15 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
     sim_data = rbind(sim_data, c(time, X, Y, Z))
 
   }
+
+  NA_panels = which(is.na(panel_data))
+
+  for(i in NA_panels){
+    panel_data[[i]] = c(n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+  }
+
   return(list(sim_data = sim_data, panel_data = panel_data))
 }
-
-
 
 
 

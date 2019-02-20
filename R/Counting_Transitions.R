@@ -50,9 +50,15 @@ interval_transitions = function(interval, event_times){
 #'                     epidemic states occur for each individual.
 
 transitions_between_observations = function(T_obs, k, event_times){
-  obs_times = seq(0, T_obs, length = k)
+  if(length(T_obs) == 1){
+    obs_times = seq(0, T_obs, length = k)
+  } else{
+    obs_times = seq(T_obs[1], T_obs[2], length = k)
+  }
   intervals = lapply(1:(length(obs_times)-1), function(i) cbind(obs_times[i], obs_times[i+1]))
   X = lapply(intervals, interval_transitions, event_times)
   return(X)
 }
 
+
+seq(0, 5, length= 6)
