@@ -21,7 +21,7 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
   #' 3. Update numbers
 
   #' Initialise
-  time = 0
+  current_time = 0
   X = N - initial_infective
   Y = initial_infective
   Z = N - X - Y
@@ -40,21 +40,21 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
   I_i = Y
 
   #' Data Storage
-  sim_data = c(time, X, Y, Z)
+  sim_data = c(current_time, X, Y, Z)
   panel_data = lapply(rep(NA, k - 1), function(X) return(X))
   #' Observation Counter (Corresponds to the current observation time we're looking out for)
   i = 1
 
   while(Y > 0){
-    old_time = time
+    old_time = current_time
     rate_next_event = Y*gamma + X*Y*beta
     time_to_next_event = rexp(1, rate_next_event)
-    time = time + time_to_next_event
+    current_time = current_time + time_to_next_event
 
-    # Recording Panel Data
+    #' Recording Panel Data
     #' Record which observation times have been passed
 
-    obs_times_passed = which(old_time <= obs_times & obs_times <= time)
+    obs_times_passed = which(old_time <= obs_times & obs_times <= current_time)
 
     if(length(obs_times_passed) > 0){
       # Record Panel
@@ -89,9 +89,7 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
     #' Update extra parameters
     Z = N - X - Y
 
-
-
-    sim_data = rbind(sim_data, c(time, X, Y, Z))
+    sim_data = rbind(sim_data, c(current_time, X, Y, Z))
 
   }
 
@@ -103,15 +101,4 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
 
   return(list(sim_data = sim_data, panel_data = panel_data))
 }
-
-
-
-
-
-
-
-
-
-
-
 
