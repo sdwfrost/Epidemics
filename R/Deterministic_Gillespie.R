@@ -36,7 +36,7 @@
 #' @param k, How many equally spaced panel observations are made between the start and end of the observation
 #'           interval.
 
-Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_obs, k){
+Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_obs, k, store = TRUE){
 
   #' Initialise
   current_time = 0
@@ -58,8 +58,12 @@ Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_o
   I_i = Y
 
   #' Data Storage
-
-  sim_data[1, ] = c(current_time, X, Y, Z)
+  if(store){
+    sim_data = matrix(NA, nrow = 2*N + 1, ncol = 4)
+    sim_data[1, ] = c(current_time, X, Y, Z)
+  } else{
+    sim_data = NULL
+  }
 
   panel_data = lapply(rep(NA, k - 1), function(X) return(X))
 
@@ -113,7 +117,9 @@ Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_o
     Z = N - X - Y
 
     #sim_data = rbind(sim_data, c(current_time, X, Y, Z))
-    sim_data[i,] = c(current_time, X, Y, Z)
+    if(store){
+      sim_data[event_no + 1,] = c(current_time, X, Y, Z)
+    }
     event_no = event_no + 1
   }
 

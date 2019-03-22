@@ -52,3 +52,29 @@
 #'
 #' This is definitely possible.
 #'
+
+
+# ==== Infectious Pressure population has been exposed to at time t ====
+
+
+IP_t = function(beta, gamma, t, U, I){
+
+  Q = U/gamma
+
+  still_infectious = t < Q + I
+
+  total_still_infectious = sum(still_infectious)
+
+  Q_sum = sum(Q[-still_infectious])
+
+  I_sum = sum(I[still_infectious])
+
+  return(beta*(t*total_still_infectious + Q_sum - I_sum))
+}
+
+
+
+
+
+
+

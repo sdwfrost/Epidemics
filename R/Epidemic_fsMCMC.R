@@ -82,7 +82,7 @@ Epidemic_fsMCMC = function(N, initial_infective, x, beta0, gamma0, no_draws, s, 
     log_theta_prop = log_theta + mvnfast::rmvn(1, mu = c(0,0), sigma = lambda*V)
     theta_prop = exp(log_theta_prop)
 
-    Y_prop = Deterministic_Gillespie1(N, initial_infective, theta_prop[1], theta_prop[2], E_curr, U_curr, T_obs, k)$panel_data
+    Y_prop = Deterministic_Gillespie1(N, initial_infective, theta_prop[1], theta_prop[2], E_curr, U_curr, T_obs, k, store = FALSE)$panel_data
 
     logP_prop = dHyperGeom(x, Y_prop, no_sampled, log = TRUE)
 
@@ -106,7 +106,7 @@ Epidemic_fsMCMC = function(N, initial_infective, x, beta0, gamma0, no_draws, s, 
     E_prop[proposal_set] = rexp(s)
     U_prop[proposal_set] = runif(s)
 
-    Y_prop = Deterministic_Gillespie1(N, initial_infective, theta[1], theta[2], E_prop, U_prop, T_obs, k)$panel_data
+    Y_prop = Deterministic_Gillespie1(N, initial_infective, theta[1], theta[2], E_prop, U_prop, T_obs, k, store = FALSE)$panel_data
 
     logP_prop = dHyperGeom(x, Y_prop, no_sampled, log = TRUE)
 
