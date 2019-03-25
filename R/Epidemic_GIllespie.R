@@ -13,7 +13,7 @@
 #'
 #'
 
-Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
+Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs, store = TRUE){
 
   #' Steps
   #' 1. Draw Exponential waiting time to next event
@@ -40,10 +40,21 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
   I_i = Y
 
   #' Data Storage
-  sim_data = c(current_time, X, Y, Z)
-  panel_data = lapply(rep(NA, k - 1), function(X) return(X))
+  if(store){
+    sim_data = matrix(NA, nrow = 2*N + 1, ncol = 5)
+    sim_data[1, ] = c(current_time, X, Y, Z, NA)
+  } else{
+    sim_data = NULL
+  }
+
+  #' sim_data = c(current_time, X, Y, Z)
+  if(panel){
+    panel_data = lapply(rep(NA, k - 1), function(X) return(X))
+  } else{
+    panel_data = NULL
+  }
   #' Observation Counter (Corresponds to the current observation time we're looking out for)
-  i = 1
+  event_no = 1
 
   while(Y > 0){
     old_time = current_time
@@ -56,7 +67,7 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
 
     obs_times_passed = which(old_time <= obs_times & obs_times <= current_time)
 
-    if(length(obs_times_passed) > 0){
+    if((length(obs_times_passed) > 0)){
       # Record Panel
       panel_data[[obs_times_passed[1]]] = c(n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
 
@@ -89,14 +100,18 @@ Epidemic_Gillespie = function(N, initial_infective, gamma, beta, k, T_obs){
     #' Update extra parameters
     Z = N - X - Y
 
-    sim_data = rbind(sim_data, c(current_time, X, Y, Z))
-
+    if(store){
+      sim_data[event_no + 1,] = c(current_time, X, Y, Z, which_event)
+    }
+    event_no = event_no + 1
   }
 
-  NA_panels = which(is.na(panel_data))
+  if(panel){
+    NA_panels = which(is.na(panel_data))
 
-  for(i in NA_panels){
-    panel_data[[i]] = c(n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+    for(i in NA_panels){
+      panel_data[[i]] = c(n_ss = X, n_si = I_s, n_sr = X_t0 - (X + I_s), n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+    }
   }
 
   return(list(sim_data = sim_data, panel_data = panel_data))

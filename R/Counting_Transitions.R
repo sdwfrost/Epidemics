@@ -60,5 +60,3 @@ transitions_between_observations = function(T_obs, k, event_times){
   return(X)
 }
 
-
-seq(0, 5, length= 6)
