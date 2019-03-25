@@ -56,14 +56,14 @@ t_inf = big_epidemic$t_inf
 t_rem = big_epidemic$t_rem
 
 T_obs = c(0,60)
-k = 60
+k = 12
 
 
 
 
 V = diag(1, 2)
-lambda = 0.0005
-s = 75
+lambda = 0.009
+s = 675
 no_its = 10000
 burn_in = 1000
 
@@ -75,10 +75,9 @@ Test = Epidemic_fsMCMC(N, initial_infective, x, beta0, gamma0, no_draws = 2*N, s
 
 #' Storage
 
-Variability = matrix(NA, nrow = 1000, ncol = 9)
+Variability = matrix(NA, nrow = 100, ncol = 9)
 x_store = list()
-i = 21
-for(i in 11:20){
+for(i in 11:90){
   random_sample = sample(1:N, 0.1*N)
   x = transitions_between_observations(T_obs, k, event_times = cbind(t_inf[random_sample], t_rem[random_sample]))
   Test = Epidemic_fsMCMC(N, initial_infective, x, beta0, gamma0, no_draws = 2*N, s, T_obs, k, lambda, V,
@@ -93,6 +92,6 @@ par(mfrow = c(1,2))
 boxplot(Variability[,1])
 boxplot(Variability[,3])
 
-
+write.csv(Variability, file ="Variability-big_epidemic")
 
 
