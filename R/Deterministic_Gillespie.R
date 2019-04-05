@@ -49,7 +49,7 @@ Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_o
     T_obs = c(0, T_obs)
   }
 
-  obs_times = seq(T_obs[1], T_obs[2], length = k)[-1]
+  obs_times = seq(T_obs[1], T_obs[2], length = k)
 
   #' Tracking Variables for Panel Data
   X_t0 = X
@@ -65,7 +65,7 @@ Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_o
     sim_data = NULL
   }
 
-  panel_data = lapply(rep(NA, k - 1), function(X) return(X))
+  panel_data = lapply(rep(NA, k), function(X) return(X))
 
   event_no = 1
 

@@ -60,7 +60,7 @@ Epidemic_fsMCMC = function(N, initial_infective, x, beta0, gamma0, no_draws, s, 
   while(logP_curr == -Inf){
     U_curr = runif(no_draws)
     E_curr = rexp(no_draws)
-    Y_curr = Deterministic_Gillespie1(N, initial_infective, theta[1], theta[2], E_curr, U_curr, T_obs, k)$panel_data
+    Y_curr = Deterministic_Gillespie1(N, initial_infective, theta[1], theta[2], E_curr, U_curr, T_obs, k, store = FALSE)$panel_data
     logP_curr = dHyperGeom(x, Y_curr, no_sampled, log = TRUE)
 
   }
@@ -149,20 +149,20 @@ Epidemic_fsMCMC = function(N, initial_infective, x, beta0, gamma0, no_draws, s, 
   # Plot Beta Samples and Sample Auto-Corrolation Function
   if(is.na(lag_max)){
     # Beta
-    plot(draws[, 1], type = 'l')
-    acf(draws[, 1])
+    plot(draws[, 1], type = 'l', ylab = expression(beta))
+    acf(draws[, 1], main = "")
 
     # Gamma
-    plot(draws[, 2], type = 'l')
-    acf(draws[, 2])
+    plot(draws[, 2], type = 'l', ylab = expression(gamma))
+    acf(draws[, 2], main = "")
   } else{
     # Beta
-    plot(draws[, 1], type = 'l')
-    acf(draws[, 1], lag_max)
+    plot(draws[, 1], type = 'l', ylab = expression(beta))
+    acf(draws[, 1], lag_max, main = "")
 
     # Gamma
-    plot(draws[, 2], type = 'l')
-    acf(draws[, 2], lag_max)
+    plot(draws[, 2], type = 'l',  ylab = expression(gamma))
+    acf(draws[, 2], lag_max, main = "")
   }
 
   #' Calculating Summary Statistics for samples
