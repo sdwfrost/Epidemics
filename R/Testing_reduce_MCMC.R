@@ -44,10 +44,10 @@ Normal_MCMC = function(x_0, lambda, no_its, burn_in, lag_max = NA, thinning_fact
     draws[1, ] = c(x_0, log_pi_0)
     x_curr = x_0
     log_pi_curr = log_pi_0
-    print("Sampling Progress")
-    pb <- progress::progress_bar$new(total = no_its)
+    #print("Sampling Progress")
+    #pb <- progress::progress_bar$new(total = no_its)
     for(i in 1:no_its){
-      pb$tick()
+      #pb$tick()
       #' Propose new beta and gamma using Multiplicative RW propsal
       x_prop = x_curr + lambda*rnorm(1)
 
@@ -100,12 +100,10 @@ Normal_MCMC = function(x_0, lambda, no_its, burn_in, lag_max = NA, thinning_fact
 }
 
 start = as.numeric(Sys.time())
-Test = Normal_MCMC(x_0 = rnorm(1), lambda = 4.1, no_its = 100000, burn_in = 1000, reduce = T)
+set.seed(1)
+Test = Normal_MCMC(x_0 = rnorm(1), lambda = 4.1, no_its = 500000, burn_in = 1000, reduce = T)
 time = as.numeric(Sys.time()) - start
 
-no_its = 100000
-lambda = 1
-x_0 = rnorm(1)
-log_pi_0 = dnorm(x_0, log = TRUE)
+plot(Test$draws[,1], exp(Test$draws[,2]))
 
 
