@@ -59,8 +59,8 @@ Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_o
 
   #' Data Storage
   if(store){
-    sim_data = matrix(NA, nrow = 2*N + 1, ncol = 4)
-    sim_data[1, ] = c(current_time, X, Y, Z)
+    sim_data = matrix(NA, nrow = 2*N + 1, ncol = 5)
+    sim_data[1, ] = c(current_time, X, Y, Z, NA)
   } else{
     sim_data = NULL
   }
@@ -118,7 +118,7 @@ Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_o
 
     #sim_data = rbind(sim_data, c(current_time, X, Y, Z))
     if(store){
-      sim_data[event_no + 1,] = c(current_time, X, Y, Z)
+      sim_data[event_no + 1,] = c(current_time, X, Y, Z, which_event)
     }
     event_no = event_no + 1
   }

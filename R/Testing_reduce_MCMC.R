@@ -99,11 +99,4 @@ Normal_MCMC = function(x_0, lambda, no_its, burn_in, lag_max = NA, thinning_fact
               time_taken = time_taken))
 }
 
-start = as.numeric(Sys.time())
-set.seed(1)
-Test = Normal_MCMC(x_0 = rnorm(1), lambda = 4.1, no_its = 500000, burn_in = 1000, reduce = T)
-time = as.numeric(Sys.time()) - start
-
-plot(Test$draws[,1], exp(Test$draws[,2]))
-
 

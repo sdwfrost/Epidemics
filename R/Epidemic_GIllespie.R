@@ -11,7 +11,8 @@
 #'
 #'
 
-Epidemic_Gillespie = function(N, a, gamma, beta, store = TRUE){
+
+Epidemic_Gillespie = function(N, a, gamma, beta){
 
   current_time = 0
   X = N - a
