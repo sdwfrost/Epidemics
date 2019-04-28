@@ -36,12 +36,12 @@
 #' @param k, How many equally spaced panel observations are made between the start and end of the observation
 #'           interval.
 
-Deterministic_Gillespie1 = function(N, initial_infective, beta, gamma, E, U, T_obs, k, store = TRUE){
+Deterministic_Gillespie1 = function(N, a, beta, gamma, E, U, T_obs, k, store = TRUE){
 
   #' Initialise
   current_time = 0
-  X = N - initial_infective
-  Y = initial_infective
+  X = N - a
+  Y = a
   Z = N - X - Y
 
   #' Panel Data

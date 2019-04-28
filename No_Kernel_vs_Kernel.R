@@ -18,6 +18,7 @@ beta = psi/N
 #' Which Population
 i = 1
 
+par(mfrow = c(1,1))
 # ==== Without Kernel ====
 susceptibles_left = c()
 for(j in 1:2000){
@@ -28,8 +29,7 @@ for(j in 1:2000){
 
 # ==== With Kernel ====
 
-kernel = Contact_Kernel(matrix(rbinom(N[i], size = 1, prob = 0.99),
-                               nrow = N[i], ncol = N[i]))
+kernel = Contact_Kernel(matrix(1, nrow = N[i], ncol = N[i]))
 
 susceptibles_left_split = c()
 for(j in 1:2000){
@@ -38,80 +38,73 @@ for(j in 1:2000){
                                                    kernel)
   susceptibles_left_split[j] = min(Test_Epidemic_kernel[,2], na.rm = T)
 }
+# ==== Deterministic ====
 
-susceptibles_left_det = c()
-for(j in 1:2000){
+kernel = Contact_Kernel(matrix(1, nrow = N[i], ncol = N[i]))
+
+start = as.numeric(Sys.time())
+
+for(j in 1:20000){
   print(j)
-  U = runif(2*N[i])
   E = rexp(2*N[i])
-  Det_Epidemic = Deterministic_Gillespie1(N[i], initial_infective = 5, beta[1], gamma, E, U,
-                                          T_obs = c(0,10), k = 1, store = TRUE)
-  susceptibles_left_det[j] = min(Det_Epidemic$sim_data[,2], na.rm = T)
-}
-
-boxplot(susceptibles_left, susceptibles_left_det)
-
-plot(final_size)
-plot(susceptibles_left, ylim = c(0, 100))
-
-
-sum(samples == 0)
-sum(split_samples == 0)
-X = 95
-Y = 5
-B = kernel(beta[1])
-reduced_B = B[1:5, 1:95]
-inf_rate = beta[1]*X*Y
-rem_rate = gamma*Y
-rate_next_event = rem_rate + inf_rate
-#' 1 Removal
-#' 0 Infection
-
-
-
-
-for(j in 1:200000){
-  samples[j] = sample(c(0,1), size = 1, prob = c(X*Y*beta[1], Y*gamma)/rate_next_event)
-}
-
-for(j in 1:200000){
-  split_samples[j] = 1*(Heterogeneous_Event(integer(0), rem_rate) == 0)
-}
-
-samples = c()
-split_samples = c()
-
-X= 95
-for(j in 1:10000){
-  #set.seed(j)
-  samples[j] = sample(c(0,1), size = 1, prob = c(X*Y*beta[1], Y*gamma)/rate_next_event)
-
-  #set.seed(j)
-  split_samples[j] = 1*(Heterogeneous_Event(reduced_B, rem_rate) == 0)
+  U = runif(2*N[i])
+  Test_Epidemic_Deterministic = Kernel_Deterministic_Gillespie(N[i], a = 5, beta[i], gamma, T_obs = c(0,10), k = 5, E, U, kernel,
+                                                               store = T)
 
 }
+time_taken = as.numeric(Sys.time()) - start
 
-
-sum(samples == 1)/length(samples)
-sum(split_samples == 1)/length(samples)
-
-final_size = c()
-final_size_split = c()
-first_event = c()
-for(j in 10001:20000){
-  Split_Epidemic = Kernel_Epidemic_Gillespie(N[1], a = 5, gamma, beta[1], kernel)
-  final_size_split[j] = max(Split_Epidemic[,4], na.rm = T) - 5
-  Epidemic = Epidemic_Gillespie(N[1], 5, gamma, beta[1])
-  final_size[j] = max(Epidemic[,4], na.rm = T) - 5
-  #first_event[j] = Split_Epidemic[2,5]
+start = as.numeric(Sys.time())
+for(j in 1:30000){
+  print(j)
+  E = rexp(2*N[i])
+  U = runif(2*N[i])
+  Test_Epidemic_Deterministic2 = Deterministic_Gillespie1(N[i], a = 5, beta[i], gamma, T_obs = c(0,10), k = 5, E, U,
+                                                          store = T)
 }
-sum(final_size )
-sum(first_event)
-plot(final_size_split)
+time_taken2 = as.numeric(Sys.time()) - start
 
-results = data.frame(c(rep("A", 1000), rep("B", 1000)), c(final_size, final_size_split))
+time_taken/time_taken2
 
-plot.coords(xlabel = c(rep("A", 1000), rep("B", 1000)), c(final_size, final_size_split))
+boxplot(susceptibles_left, susceptibles_left_split, susceptibles_left_det)
+min(susceptibles_left_det)
+# ==== fsMCMC ====
 
-boxplot(final_size, final_size_split)
-sum(final_size == 0)
+
+psi = 1 # Normalised infection rate
+p = 0.05 # Proportion Infected
+N = c(2*10^2, 10^3, 10^4, 10^5) # Population
+a = p*N
+beta = psi/N # Infection parameter
+gamma = 0.15 # Removal Parameter
+prop_obs = 0.1
+T_obs = c(0,30)
+k = 5
+kernel = Contact_Kernel(matrix(1, nrow = N[i], ncol = N[i]))
+
+
+Deterministic_Gillespie1(N[i], a[i], beta[i], gamma, E, U, T_obs, k, store = F)
+V = diag(1,2)
+no_its = 10000
+burn_in = 1000
+lambda = 0.03
+s = 180
+
+i = 1
+
+E = rexp(2*N[i])
+U = runif(2*N[i])
+Kernel_Deterministic_Gillespie(N[i], a[i], beta[i], gamma, E, U, T_obs, k, kernel, store = T)
+
+
+rep_sample = c(sample(N[i] - a[i], size = prop_obs*(N[i] - a[i])),
+               sample((N[i] - a[i] + 1 ):N[i], size = prop_obs*a[i]))
+x_rep = gillespie_panel_transitions(X_0 = prop_obs*(N[i] - a[i]), Y_0 = prop_obs*a[i],
+                                    Epidemic1[,5], Epidemic1[,1], Epidemic1[,6],
+                                    T_obs, k, subset = rep_sample)
+Test = Epidemic_fsMCMC(N[i], a[i], x_rep, beta[i], gamma, kernel = NULL, no_draws = 2*N[i], s, T_obs, k, lambda, V,
+                       no_its, burn_in)
+
+Test = Epidemic_fsMCMC(N[i], a[i], x_rep, beta[i], gamma, kernel = kernel, no_draws = 2*N[i], s, T_obs, k, lambda, V,
+                       no_its, burn_in)
+
