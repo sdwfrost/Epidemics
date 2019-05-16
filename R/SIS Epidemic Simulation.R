@@ -1,0 +1,352 @@
+#'
+#' SIS Epidemic Simulation
+#'
+#'
+
+
+
+SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
+
+  current_time = 0
+  X = N - a
+  Y = a
+
+  #' Track specific people
+  S = 1:(N - a) #' Set of Susceptibles
+  I = (N - a + 1):N #' Set of Infectives
+
+  #' Infection Matrix
+  B = kernel(beta)
+
+  sim_data = matrix(NA, nrow = 2*N + 1, ncol = 5)
+  sim_data[1, ] = c(current_time, X, Y, NA, NA)
+  no_event = 1
+  while(Y > 0 & current_time < obs_end){
+
+    old_time = current_time
+
+    reduced_B = B[I,S, drop = F]
+
+    if(X == 0){
+      individual_inf_rate = 0
+    } else{
+      individual_inf_rate = Matrix::colSums(reduced_B)
+    }
+
+    total_inf_pressure = sum(individual_inf_rate)
+    total_rem_rate = Y*gamma
+    rate_next_event = total_rem_rate + total_inf_pressure
+    time_to_next_event = rexp(1, rate_next_event)
+    current_time = current_time + time_to_next_event
+
+    which_event = Heterogeneous_Event(individual_inf_rate, total_rem_rate)
+
+    if(which_event == 0){
+      if(length(I) == 1){
+        individual = I
+      } else{
+        individual = sample(I, size = 1)
+      }
+      Y = Y - 1
+      X = X + 1
+      I = I[I != individual]
+      S = c(S, individual)
+    } else{
+      individual = S[which_event]
+      S = S[-which_event]
+      I = c(I, individual)
+      X = X - 1
+      Y = Y + 1
+    }
+    which_event = 1*(which_event == 0)
+    sim_data[no_event + 1, ] = c(current_time, X, Y, which_event, individual)
+    no_event = no_event + 1
+  }
+  return(list(sim_data = sim_data, kernel = kernel))
+}
+
+
+#' Samples the event which occurs in an heterogeneous epidemic.
+#' If a removal occurs, the funciton returns 0, which represents
+#' the occurance of a removal
+#' If an infection occurs, the index of the individual who becomes
+#' infected is returned.
+
+Heterogeneous_Event = function(individual_inf_rate, removal_rate){
+  event = sample(c(1:length(individual_inf_rate), 0), size = 1,
+                 prob = c(individual_inf_rate, removal_rate))
+  return(event)
+}
+
+SIS_panel_transitions = function(X_0, Y_0, events, times, individuals, T_obs, k, subset = NULL){
+
+  X_t0 = X_0
+  Y_t0 = Y_0
+  N = X_0 + Y_0
+
+  X_s = X_0
+  X_i = 0
+
+  Y_i = Y_0
+  Y_s = 0
+
+  S_s = 1:(N)
+
+  times = times[!is.na(times) & times != 0]
+  events = events[!is.na(events)]
+  individuals = individuals[!is.na(individuals)]
+  if(1 - is.null(subset)){
+    relevent_events = sort(unlist(sapply(subset, function(X) return(which(X == individuals)))))
+    events = events[relevent_events]
+    times = times[relevent_events]
+    individuals = individuals[relevent_events]
+  }
+
+  #' Panel Data
+  if(length(T_obs) == 1){
+    T_obs = c(0, T_obs)
+  }
+
+  obs_times = seq(T_obs[1], T_obs[2], length = k)
+
+  panel_data = lapply(rep(NA, k), function(X) return(X))
+
+  for(i in 1:length(obs_times)){
+    if(i == 1){
+      time_indices = which(times < obs_times[i])
+    } else{
+      time_indices = which(times < obs_times[i] & times > obs_times[i-1])
+    }
+
+    events_reduced = events[time_indices]
+    ind_reduced = individuals[time_indices]
+
+
+    n_ss = sum(sapply(X = unique(ind_reduced), function(X) tail(event_reduced[ind_reduced == X]) == 1))
+
+
+    #' At the start of the period, Individual is susceptible but becomes infected (but
+    #' not removed) before the next observation
+    infections = sum(events[time_indicies] == 0)
+
+    #' At the start of the period, Individual is infected and is removed before
+    #' next observation.
+    no_events_individuals = sapply(subset, function(X) sum(individuals[time_indicies] == X))
+    removals_from_susc = sum(no_events_individuals == 2)
+
+    #' Everyone who is removed in this period
+    removals = sum(events[time_indicies] == 1)
+
+    #' At the start of the period, Individual is susceptible but is removed before
+    #' next observation
+    #'
+
+    removals_from_inf = removals - removals_from_susc
+
+    X_t1 = X_t0 - infections
+    Y_t1 = Y_t0 + infections - removals
+    I_s = infections - removals_from_susc
+    I_i = Y_t0 - removals_from_inf
+
+    panel_data[[i]] = c(n_ss = X_t1, n_si = I_s, n_sr = removals_from_susc, n_ii = I_i, n_ir = Y_t0 - I_i, n_rr = N - X_t0 - Y_t0)
+
+    X_t0 = X_t1
+    Y_t0 = Y_t1
+  }
+  return(panel_data)
+}
+
+
+# ==== Deterministic ====
+
+
+SIS_Deterministic_Gillespie = function(N, a, beta, gamma, E, U, T_obs, k, kernel, obs_end, store = TRUE){
+
+  #' Initialise
+  current_time = 0
+  X = N - a
+  Y = a
+
+  S_s = 1:(N - a)
+  S_i = NULL
+
+  I_i = (N - a + 1):N
+  I_s = NULL
+
+  B = kernel(beta)
+
+  #' Panel Data
+  if(length(T_obs) == 1){
+    T_obs = c(0, T_obs)
+  }
+
+  obs_times = seq(T_obs[1], T_obs[2], length = k)
+
+  #' Tracking Variables for Panel Data
+
+  Y_s = 0
+  Y_i = Y
+  X_s = X
+  X_i = 0
+
+
+  #' Data Storage
+  if(store){
+    sim_data = matrix(NA, nrow = length(U), ncol = 4)
+    sim_data[1, ] = c(current_time, X, Y, NA)
+  } else{
+    sim_data = NULL
+  }
+
+  panel_data = lapply(rep(NA, k), function(X) return(X))
+
+  event_no = 1
+
+  while(Y > 0 & current_time < obs_end){
+    old_time = current_time
+
+    # Rate of Infection
+
+    reduced_B = B[c(I_s, I_i),c(S_s, S_i), drop = F]
+
+
+    if(X == 0){
+      individual_inf_rate = 0
+    } else{
+      # First X_s rates will be those corresponding to susceptibles
+      # which started in the susceptible state.
+      # The next X_i rates will correspond to those who started in the
+      # infected state
+      individual_inf_rate = Matrix::colSums(reduced_B)
+    }
+
+    total_inf_pressure = sum(individual_inf_rate)
+
+    # Rate of Removal
+    rem_rate_from_S = Y_s*gamma
+    rem_rate_from_I = Y_i*gamma
+    total_rem_rate =  rem_rate_from_S + rem_rate_from_I
+
+    # Time of Next Event
+    rate_next_event = total_rem_rate + total_inf_pressure
+    time_to_next_event = (1/rate_next_event)*E[event_no]
+    current_time = current_time + time_to_next_event
+
+    #' Recording Panel Data
+    #' Record which observation times have been passed
+    obs_times_passed = which(old_time <= obs_times & obs_times <= current_time)
+
+    if(length(obs_times_passed) > 0){
+      # Record Panel
+      panel_data[[obs_times_passed[1]]] = c(n_ss = X_s, n_si = Y_s, n_ii = Y_i, n_is = X_i)
+
+      # Reset
+      X_t0 = X
+      Y_t0 = Y
+
+      Y_i = Y
+      Y_s = 0
+      X_s = X
+      X_i = 0
+
+      S_s = c(S_s, S_i)
+      S_i = NULL
+
+      I_i = c(I_i, I_s)
+      I_s = NULL
+
+      for(i in obs_times_passed[-1]){
+        panel_data[[i]] = c(n_ss = X_s, n_si = Y_s, n_ii = Y_i, n_is = X_i)
+      }
+    }
+
+    which_event = Heterogeneous_Event_Deterministic(individual_inf_rate, rep(gamma, Y), U[event_no])
+
+    if(which_event <= X_s){ #' Infection
+      individual = S_s[which_event]
+      #' Susceptibles
+      X = X - 1
+      X_s = X_s - 1
+      S_s = S_s[!(individual == S_s)]
+
+      #' Infected
+      Y = Y + 1
+      Y_s = Y_s + 1
+      I_s = c(I_s, individual)
+
+    } else if(which_event <= X_s + X_i){
+      individual = S_i[which_event - X_s]
+      #' Susceptibles
+      X = X - 1
+      X_i = X_i - 1
+      S_i = S_i[!(individual == S_i)]
+
+      #' Infected
+      Y = Y + 1
+      Y_i = Y_i + 1
+      I_i = c(I_i, individual)
+
+
+    } else if(which_event <= X + Y_s){
+
+      individual = I_s[which_event - X]
+
+      #' Infected
+      Y = Y - 1
+      Y_s = Y_s - 1
+      I_s = I_s[!(I_s == individual)]
+
+      #' Susceptibles
+      X = X + 1
+      X_s = X_s + 1
+      S_s = c(S_s, individual)
+
+    } else{
+      individual = I_i[which_event - X - Y_s]
+
+      #' Infected
+      Y_i = Y_i - 1
+      Y = Y - 1
+      I_i = I_i[!(I_i == individual)]
+
+      #' Susceptibles
+      X = X + 1
+      X_i = X_i + 1
+      S_i = c(S_i, individual)
+
+    }
+
+    if(store){
+      sim_data[event_no + 1,] = c(current_time, X, Y, which_event)
+    }
+    event_no = event_no + 1
+  }
+
+  NA_panels = which(is.na(panel_data))
+
+  for(i in NA_panels){
+    panel_data[[i]] = c(n_ss = X_s, n_si = Y_s, n_ii = Y_i, n_is = X_i)
+  }
+
+  return(list(sim_data = sim_data, panel_data = panel_data, no_events = event_no))
+}
+
+
+Heterogeneous_Event_Deterministic = function(individual_inf_rate, removal_rates, U){
+  if(length(individual_inf_rate) == 1){
+    if(individual_inf_rate == 0){
+      probs = c(removal_rates)/sum(c(removal_rates))
+    } else{
+      probs = c(individual_inf_rate, removal_rates)/sum(c(individual_inf_rate, removal_rates))
+    }
+  } else{
+    probs = c(individual_inf_rate, removal_rates)/sum(c(individual_inf_rate, removal_rates))
+  }
+
+  probs_cumsum = cumsum(probs)
+  #print(c(probs_cumsum[100], U))
+  index = sum(probs_cumsum < U) + 1
+  #print(c("Index", index))
+  return(index)
+}
+

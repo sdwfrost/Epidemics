@@ -24,26 +24,19 @@ Kernel_Epidemic_Gillespie = function(N, a, gamma, beta, kernel){
 
     old_time = current_time
 
-    reduced_B = B[I,S]
+    reduced_B = B[I,S, drop = F]
 
-    if(X == 1){
-      individual_inf_rate = sum(reduced_B)
-    } else if(X == 0){
+    if(X == 0){
       individual_inf_rate = 0
-    } else if(Y == 1){
-      individual_inf_rate = reduced_B
     } else{
-      individual_inf_rate = colSums(reduced_B)
+      individual_inf_rate = Matrix::colSums(reduced_B)
     }
-
 
     total_inf_pressure = sum(individual_inf_rate)
     total_rem_rate = Y*gamma
     rate_next_event = total_rem_rate + total_inf_pressure
     time_to_next_event = rexp(1, rate_next_event)
     current_time = current_time + time_to_next_event
-
-    #which_event = sample(c(0,1), size = 1, prob = c(total_inf_pressure, total_rem_rate)/rate_next_event)
 
     which_event = Heterogeneous_Event(individual_inf_rate, total_rem_rate)
 
@@ -68,8 +61,7 @@ Kernel_Epidemic_Gillespie = function(N, a, gamma, beta, kernel){
     sim_data[no_event + 1, ] = c(current_time, X, Y, Z, which_event, individual)
     no_event = no_event + 1
   }
-  return(sim_data)
-  #return(list(X = sim_data[,2], Y = sim_data[,3], Z = sim_data[,4], event_times = sim_data[,1], event_type = sim_data[,5], individual = sim_data[,6]))
+  return(list(sim_data = sim_data, kernel = kernel))
 }
 
 
@@ -80,13 +72,6 @@ Kernel_Epidemic_Gillespie = function(N, a, gamma, beta, kernel){
 #' infected is returned.
 
 Heterogeneous_Event = function(individual_inf_rate, removal_rate){
-  #if(length(infection_rate_matrix) == 0){
-  #  return(0)
-  #} else if(is.null(dim(infection_rate_matrix))){
-  #  individual_inf_rate = infection_rate_matrix
-  #} else{
-  #  individual_inf_rate = colSums(infection_rate_matrix)
-  #}
   event = sample(c(1:length(individual_inf_rate), 0), size = 1,
                  prob = c(individual_inf_rate, removal_rate))
   return(event)
@@ -134,22 +119,15 @@ Kernel_Deterministic_Gillespie = function(N, a, beta, gamma, E, U, T_obs, k, ker
 
   while(Y > 0){
     old_time = current_time
-    #print(c("Event", event_no))
-    #print(c("S", S[1]))
-    #print(c("I_s", I_s[1]))
-    #print(c("I_i", I_i))
+
     # Rate of Infection
 
-    reduced_B = B[c(I_s, I_i),S]
+    reduced_B = B[c(I_s, I_i),S, drop = F]
 
-    if(X == 1){
-      individual_inf_rate = sum(reduced_B)
-    } else if(X == 0){
+    if(X == 0){
       individual_inf_rate = 0
-    } else if(Y == 1){
-      individual_inf_rate = reduced_B
     } else{
-      individual_inf_rate = colSums(reduced_B)
+      individual_inf_rate = Matrix::colSums(reduced_B)
     }
 
     total_inf_pressure = sum(individual_inf_rate)
@@ -236,23 +214,20 @@ Kernel_Deterministic_Gillespie = function(N, a, beta, gamma, E, U, T_obs, k, ker
 
 
 Heterogeneous_Event_Deterministic = function(individual_inf_rate, removal_rates, U){
-  #if(length(infection_rate_matrix) == 0){
-  #  individual_inf_rate = 0
-  #} else if(is.null(dim(infection_rate_matrix))){
-  #  individual_inf_rate = infection_rate_matrix
-  #} else{
-  #  individual_inf_rate = colSums(infection_rate_matrix)
-  #}
-
-  probs = c(individual_inf_rate, removal_rates)/sum(c(individual_inf_rate, removal_rates))
+  if(length(individual_inf_rate) == 1){
+    if(individual_inf_rate == 0){
+      probs = c(removal_rates)/sum(c(removal_rates))
+    } else{
+      probs = c(individual_inf_rate, removal_rates)/sum(c(individual_inf_rate, removal_rates))
+    }
+  } else{
+    probs = c(individual_inf_rate, removal_rates)/sum(c(individual_inf_rate, removal_rates))
+  }
 
   probs_cumsum = cumsum(probs)
-  more = TRUE
-  index = 0
-  while(more){
-    index = index + 1
-    more = probs_cumsum[index] < U
-  }
+
+  index =  sum(probs_cumsum < U) + 1
+
   return(index)
 }
 

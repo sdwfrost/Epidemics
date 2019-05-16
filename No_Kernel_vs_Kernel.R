@@ -36,38 +36,70 @@ for(j in 1:2000){
   print(j)
   Test_Epidemic_kernel = Kernel_Epidemic_Gillespie(N[i], a = 5, gamma, beta[i],
                                                    kernel)
-  susceptibles_left_split[j] = min(Test_Epidemic_kernel[,2], na.rm = T)
+  susceptibles_left_split[j] = min(Test_Epidemic_kernel$sim_data[,2], na.rm = TRUE)
 }
+
 # ==== Deterministic ====
 
 kernel = Contact_Kernel(matrix(1, nrow = N[i], ncol = N[i]))
-
-start = as.numeric(Sys.time())
-
-for(j in 1:20000){
+susceptibles_left_det = c()
+for(j in 1:2000){
   print(j)
   E = rexp(2*N[i])
   U = runif(2*N[i])
   Test_Epidemic_Deterministic = Kernel_Deterministic_Gillespie(N[i], a = 5, beta[i], gamma, T_obs = c(0,10), k = 5, E, U, kernel,
                                                                store = T)
 
+  susceptibles_left_det[j] = min(Test_Epidemic_Deterministic$sim_data[,2], na.rm = TRUE)
 }
-time_taken = as.numeric(Sys.time()) - start
-
-start = as.numeric(Sys.time())
-for(j in 1:30000){
-  print(j)
-  E = rexp(2*N[i])
-  U = runif(2*N[i])
-  Test_Epidemic_Deterministic2 = Deterministic_Gillespie1(N[i], a = 5, beta[i], gamma, T_obs = c(0,10), k = 5, E, U,
-                                                          store = T)
-}
-time_taken2 = as.numeric(Sys.time()) - start
-
-time_taken/time_taken2
 
 boxplot(susceptibles_left, susceptibles_left_split, susceptibles_left_det)
-min(susceptibles_left_det)
+
+# ==== Profiling Gillespie Simulations w/ kernel ====
+
+#' Standard
+
+tmp = tempfile()
+Rprof(tmp, interval = 0.01)
+
+for(j in 1:2000){
+  Test_Epidemic_norm = Epidemic_Gillespie(N[i], a = 5, gamma, beta[i])
+}
+
+Rprof(NULL)
+summaryRprof(tmp)
+
+
+
+#' W/ kernel
+kernel = Contact_Kernel(matrix(1, nrow = N[i], ncol = N[i]))
+
+tmp = tempfile()
+Rprof(tmp, interval = 0.01)
+for(j in 1:2000){
+  Test_Epidemic_kernel = Kernel_Epidemic_Gillespie(N[i], a = 5, gamma, beta[i],
+                                                   kernel)
+}
+Rprof(NULL)
+summaryRprof(tmp)
+
+
+
+#' Deterministic
+tmp = tempfile()
+Rprof(tmp, interval = 0.01)
+
+for(j in 1:2000){
+  E = rexp(2*N[i])
+  U = runif(2*N[i])
+  Test_Epidemic_Deterministic = Kernel_Deterministic_Gillespie(N[i], a = 5, beta[i], gamma, T_obs = c(0,10), k = 5, E, U, kernel,
+                                                               store = T)
+}
+
+Rprof(NULL)
+summaryRprof(tmp)
+
+
 # ==== fsMCMC ====
 
 
@@ -79,32 +111,33 @@ beta = psi/N # Infection parameter
 gamma = 0.15 # Removal Parameter
 prop_obs = 0.1
 T_obs = c(0,30)
-k = 5
-kernel = Contact_Kernel(matrix(1, nrow = N[i], ncol = N[i]))
+k = 6
 
 
-Deterministic_Gillespie1(N[i], a[i], beta[i], gamma, E, U, T_obs, k, store = F)
-V = diag(1,2)
-no_its = 10000
-burn_in = 1000
-lambda = 0.03
-s = 180
+
+sim_data1 = Contact_Epidemic$sim_data
 
 i = 1
-
-E = rexp(2*N[i])
-U = runif(2*N[i])
-Kernel_Deterministic_Gillespie(N[i], a[i], beta[i], gamma, E, U, T_obs, k, kernel, store = T)
-
-
 rep_sample = c(sample(N[i] - a[i], size = prop_obs*(N[i] - a[i])),
                sample((N[i] - a[i] + 1 ):N[i], size = prop_obs*a[i]))
 x_rep = gillespie_panel_transitions(X_0 = prop_obs*(N[i] - a[i]), Y_0 = prop_obs*a[i],
-                                    Epidemic1[,5], Epidemic1[,1], Epidemic1[,6],
+                                    sim_data1[,5], sim_data1[,1], sim_data1[,6],
                                     T_obs, k, subset = rep_sample)
-Test = Epidemic_fsMCMC(N[i], a[i], x_rep, beta[i], gamma, kernel = NULL, no_draws = 2*N[i], s, T_obs, k, lambda, V,
+
+
+
+V = diag(1,2)
+no_its = 10000
+burn_in = 1000
+lambda = 0.2
+s = 250
+
+Test = Epidemic_fsMCMC(N[i], a[i], x_rep, beta[i], gamma, kernel = Contact_Epidemic$kernel, no_draws = 2*N[i], s, T_obs, k, lambda, V,
                        no_its, burn_in)
 
+
 Test = Epidemic_fsMCMC(N[i], a[i], x_rep, beta[i], gamma, kernel = kernel, no_draws = 2*N[i], s, T_obs, k, lambda, V,
-                       no_its, burn_in)
+                       no_its = 1000, burn_in = 100)
+
+
 
