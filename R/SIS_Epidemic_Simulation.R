@@ -3,8 +3,6 @@
 #'
 #'
 
-
-
 SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
 
   current_time = 0
@@ -18,23 +16,32 @@ SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
   #' Infection Matrix
   B = kernel(beta)
 
-  sim_data = matrix(NA, nrow = 2*N + 1, ncol = 5)
-  sim_data[1, ] = c(current_time, X, Y, NA, NA)
+  event_table = data.frame(matrix(NA, nrow = N + 2*N + 1, ncol = 4))
+
+  event_table[1:(N-a), ] = matrix(c(1:(N-a), rep(0, N - a), rep(1, N - a), rep(1, N - a)),
+                                  nrow = N - a, ncol = 4, byrow = FALSE)
+  event_table[(N - a + 1):N, ] = matrix(c((N - a + 1):N, rep(0, a), rep(2, a), rep(2, a)),
+                                       nrow = a, ncol = 4, byrow = FALSE)
+
+  colnames(event_table) = c("ID", "time", "state", "prev_state")
+  X = c(X, rep(NA, 2*N + 1))
+  Y = c(Y, rep(NA, 2*N + 1))
+
   no_event = 1
-  while(Y > 0 & current_time < obs_end){
+  while(Y[no_event] > 0 & current_time < obs_end){
 
     old_time = current_time
 
     reduced_B = B[I,S, drop = F]
 
-    if(X == 0){
+    if(X[no_event] == 0){
       individual_inf_rate = 0
     } else{
       individual_inf_rate = Matrix::colSums(reduced_B)
     }
 
     total_inf_pressure = sum(individual_inf_rate)
-    total_rem_rate = Y*gamma
+    total_rem_rate = Y[no_event]*gamma
     rate_next_event = total_rem_rate + total_inf_pressure
     time_to_next_event = rexp(1, rate_next_event)
     current_time = current_time + time_to_next_event
@@ -47,22 +54,25 @@ SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
       } else{
         individual = sample(I, size = 1)
       }
-      Y = Y - 1
-      X = X + 1
+      Y[no_event + 1] = Y[no_event] - 1
+      X[no_event + 1] = X[no_event] + 1
       I = I[I != individual]
       S = c(S, individual)
+      prev_state = 2
+      state = 1
     } else{
       individual = S[which_event]
       S = S[-which_event]
       I = c(I, individual)
-      X = X - 1
-      Y = Y + 1
+      X[no_event + 1] = X[no_event] - 1
+      Y[no_event + 1] = Y[no_event] + 1
+      prev_state = 1
+      state = 2
     }
-    which_event = 1*(which_event == 0)
-    sim_data[no_event + 1, ] = c(current_time, X, Y, which_event, individual)
+    event_table[N + no_event, ] = c(individual, current_time, state, prev_state)
     no_event = no_event + 1
   }
-  return(list(sim_data = sim_data, kernel = kernel))
+  return(list(event_table = na.omit(event_table), X = X, Y = Y, kernel = kernel))
 }
 
 
