@@ -12,8 +12,8 @@ library(Epidemics)
 
 N = 100
 a = 5
-gamma = 0.1
-beta = 0.001
+gamma = 0.5
+beta = 0.1
 kernel = Contact_Kernel(matrix(1, N, N))
 obs_end = Inf
 epidemic = SIR_Gillespie(N, a, gamma, beta, kernel, obs_end)
@@ -21,8 +21,8 @@ epidemic = SIR_Gillespie(N, a, gamma, beta, kernel, obs_end)
 attach(epidemic$event_table)
 
 #' Plot evolution of the epidemic
-plot(time, epidemic$Y, type = 'l', col = 'red', ylim = c(0,100))
-lines(time, epidemic$X, type = 'l', col = 'blue')
+plot.epidemic(time, N, epidemic$X, epidemic$Y)
+
 
 transition_table.epidemics(ID, time, state, prev_state, period = c(0.0001, 51), 1:3, c("S", "I", "R"))
 
@@ -33,18 +33,18 @@ detach(epidemic$event_table)
 
 # ==== Simulating Endemic (SIS process) ====
 set.seed(1)
-N = 10
-a = 1
-gamma = 0.1
-beta = 0.001
+N = 100
+a = 5
+gamma = 0.5
+beta = 0.01
 kernel = Contact_Kernel(matrix(1, N, N))
 obs_end = 50
-
+time[time != 0]
 epidemic = SIS_Gillespie(N, a , gamma, beta, kernel, obs_end)
 attach(epidemic$event_table)
 
 #' Plot evolution of the epidemic
-plot(time, epidemic$Y, type = 'l', col = 'red', ylim = c(0,100))
+plot.epidemic(time, N, epidemic$X, epidemic$Y)
 lines(time, epidemic$X, type = 'l', col = 'blue')
 
 transition_table.epidemics(ID, time, state, prev_state, period = c(0, 51), 1:2, c("S", "I"))

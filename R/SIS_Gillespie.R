@@ -17,6 +17,8 @@ SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
   B = kernel(beta)
 
   event_table = data.frame(matrix(NA, nrow = 2*N + 1, ncol = 4))
+  colnames(event_table) = c("ID", "time", "state", "prev_state")
+
   event_table[1,] = c(NA, current_time, NA, NA)
 
   event_table[1:(N-a), ] = matrix(c(1:(N-a), rep(0, N - a), rep(1, N - a), rep(1, N - a)),
