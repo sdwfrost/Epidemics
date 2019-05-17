@@ -45,14 +45,40 @@ state_table = function(x, y, states = NULL, levels){
 }
 
 
-transition_table.epidemics = function(subject, state, prev_state, levels, state_names = NULL, output = "table"){
+transition_table.epidemics = function(subject, times, state, prev_state, period, levels, state_names = NULL, output = "table"){
+
+  relevant_events = period[1] <= times & times <= period[2]
+  previous_events = times < period[1]
+
   ID = unique(subject)
-  start_state = prev_state[sapply(ID, function(ID) head(which(subject == ID), n = 1))]
-  end_state = state[sapply(ID, function(ID) tail(which(subject == ID), n = 1))]
+  ID_r_e = unique(subject[relevant_events])
+
+  ID_p_e = ID[!(ID %in% ID_r_e)]
+
+  if(length(ID_p_e) > 0){
+    state_ID_p_e = state[sapply(X = ID_p_e, function(X) tail(which(subject[previous_events] == X), n = 1))]
+  } else{
+    state_ID_p_e = NULL
+  }
+
+  if(length(ID_r_e) > 0){
+    start_state = c(prev_state[relevant_events][sapply(X = ID_r_e, function(X) head(which(subject[relevant_events] == X), n = 1))],
+                    state_ID_p_e)
+
+
+    end_state = c(state[relevant_events][sapply(X = ID_r_e, function(X) tail(which(subject[relevant_events] == X), n = 1))],
+                  state_ID_p_e)
+  } else{
+    start_state = state_ID_p_e
+
+    end_state = state_ID_p_e
+  }
+
+
   trans = state_table(start_state, end_state, state_names, levels)
   #trans = table(start_state, end_state)
 
-  names(dimnames(trans)) = c("t_1", "t_0")
+  names(dimnames(trans)) = c("t_0", "t_1")
 
   if(output == "table"){
     return(trans)
@@ -63,8 +89,7 @@ transition_table.epidemics = function(subject, state, prev_state, levels, state_
   }
 }
 
-panel_data.epidemics = function(times, subject, state, prev_state, state_names, T_obs, k, obs_times = NULL, data = NULL){
-
+panel_data.epidemics = function(subject, times, state, prev_state, state_names, levels, T_obs, k, obs_times = NULL, data = NULL){
   if(!is.null(data)){
     data = as.data.frame(data)
     times = eval(substitute(times), data, parent.frame())
@@ -73,7 +98,6 @@ panel_data.epidemics = function(times, subject, state, prev_state, state_names, 
   }
 
   n = length(times)
-
   if(!is.null(data)){
     subject = if(missing(subject)){
               rep(1, n)
@@ -81,18 +105,22 @@ panel_data.epidemics = function(times, subject, state, prev_state, state_names, 
               eval(substitute(subject), data, parent.frame())
             }
   }
-
+  if(missing(levels)){
+    levels = 1:length(state_names)
+  }
   if(is.null(obs_times)){
     obs_times = seq(T_obs[1], T_obs[2], length = k)
   }
 
-  i = 1:length(obs_times)
+  #time_indices = lapply(i, function(i) which(obs_times[i] < times & times < obs_times[i + 1]))
 
-  time_indices = lapply(i, function(i) which(obs_times[i] < times & times < obs_times[i + 1]))
+  i = 1:(length(obs_times) - 1)
+  panel_data = lapply(X = i,
+                      function(X) transition_table.epidemics(subject, times, state,
+                                                             prev_state, obs_times[c(X, X + 1)],
+                                                             levels, state_names))
 
-  panel_data = lapply(X = time_indices,
-                      function(X) transition_table.epidemics(subject[X], state[X], prev_state[X]))
-
+  return(panel_data)
 }
 
 
