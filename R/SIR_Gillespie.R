@@ -2,7 +2,7 @@
 #' Epidemic Gillespie w/ kernel set-up
 #'
 
-SIR_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
+SIR_Gillespie = function(N, a, gamma, beta, kernel, obs_end, U, E){
 
   current_time = 0
   X = N - a
@@ -15,7 +15,9 @@ SIR_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
   R = NULL #' Set of removed
 
   #' INfection Matrix
-  B = kernel(beta)
+  if(!missing(kernel)){
+    B = kernel(beta)
+  }
 
   event_table = data.frame(matrix(NA, nrow = 2*N + 1, ncol = 4))
 
@@ -29,30 +31,42 @@ SIR_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
 
     old_time = current_time
 
-    reduced_B = B[I,S, drop = F]
+    if(!missing(kernel)){
+      reduced_B = B[I,S, drop = F]
+    }
 
     if(X[no_event] == 0){
       individual_inf_rate = 0
     } else{
-      individual_inf_rate = Matrix::colSums(reduced_B)
+      if(!missing(kernel)){
+        individual_inf_rate = Matrix::colSums(reduced_B)
+      } else{
+        individual_inf_rate = rep(Y[no_event]*beta, X[no_event])
+      }
     }
 
-    total_inf_pressure = sum(individual_inf_rate)
+    total_inf_rate = sum(individual_inf_rate)
     total_rem_rate = Y[no_event]*gamma
-    rate_next_event = total_rem_rate + total_inf_pressure
+    rate_next_event = total_rem_rate + total_inf_rate
     time_to_next_event = rexp(1, rate_next_event)
     current_time = current_time + time_to_next_event
 
-    which_event = Heterogeneous_Event(individual_inf_rate, total_rem_rate)
+    #event = event.epidemics(total_inf_rate, total_rem_rate)
+    event = event.epidemics2(individual_inf_rate, gamma, Y[no_event])
 
-    if(which_event == 0){
+    if(event$event == 1){
       if(length(I) == 1){
         individual = I
       } else{
         individual = sample(I, size = 1)
       }
-      I = I[I != individual]
+
+      individual = I[event$ID_index]
+      I = I[-event$ID_index]
       R = c(R, individual)
+
+      #I = I[I != individual]
+      #R = c(R, individual)
 
       X[no_event + 1] = X[no_event]
       Y[no_event + 1] = Y[no_event] - 1
@@ -61,22 +75,26 @@ SIR_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
       prev_state = 2
       state = 3
     } else{
-      individual = S[which_event]
-      S = S[-which_event]
+      individual = S[event$ID_index]
+      S = S[-event$ID_index]
       I = c(I, individual)
+
       X[no_event + 1] = X[no_event] - 1
       Y[no_event + 1] = Y[no_event] + 1
       Z[no_event + 1] = Z[no_event]
+
       prev_state = 1
       state = 2
     }
     #which_event = 1*(which_event == 0)
     #sim_data[no_event + 1, ] = c(current_time, X, Y, Z, which_event, individual)
-    event_table[N + no_event + 1, ] = c(individual, current_time, state, prev_state)
+    print(no_event)
+    event_table[N + no_event, ] = c(individual, current_time, state, prev_state)
     no_event = no_event + 1
   }
   event_table = na.omit(event_table)
-  return(list(event_table = event_table, X = X, Y = Y, Z = Z, kernel = kernel))
+  return(list(event_table = event_table, X = X, Y = Y, Z = Z, kernel = if(!missing(kernel)){
+                                                                         kernel} else{NULL}))
 }
 
 
@@ -86,11 +104,39 @@ SIR_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
 #' If an infection occurs, the index of the individual who becomes
 #' infected is returned.
 
-Heterogeneous_Event = function(individual_inf_rate, removal_rate){
-  event = sample(c(1:length(individual_inf_rate), 0), size = 1,
-                 prob = c(individual_inf_rate, removal_rate))
-  return(event)
+event.epidemics = function(total_inf_rate, removal_rate, U, individual_inf_rate, Y){
+  if(missing(U) | missing(individual_inf_rate) | missing(Y)){
+    event = sample(c(0, 1), size = 1, prob = c(total_inf_rate, removal_rate))
+    return(event)
+  } else{
+    X = length(individual_inf_rate)
+    ID_index = sum(cumsum(c(individual_inf_rate, rep(removal_rate/Y, Y))))
+    if(ID_index <= X){
+      event = 0
+    } else{
+      event = 1
+      ID_index = ID_index - X
+    }
+    return(list(event = event, ID_index = ID_index))
+  }
 }
+
+event.epidemics2 = function(individual_inf_rate, gamma, Y, U){
+  if(missing(U)){
+    U = runif(1, 0, 1)
+  }
+  X = length(individual_inf_rate)
+  total_rate = sum(c(individual_inf_rate, rep(gamma,Y)))
+  ID_index = sum(cumsum(c(individual_inf_rate, rep(gamma, Y))/total_rate) < U) + 1
+  if(ID_index <= X){
+    event = 0
+  } else{
+    event = 1
+    ID_index = ID_index - X
+  }
+  return(list(event = event, ID_index = ID_index))
+}
+
 
 
 Kernel_Deterministic_Gillespie = function(N, a, beta, gamma, E, U, T_obs, k, kernel, store = TRUE){

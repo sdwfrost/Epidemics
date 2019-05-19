@@ -3,7 +3,7 @@
 #'
 #'
 
-SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
+SIS_Gillespie = function(N, a, gamma, beta, obs_end, kernel, U, E){
 
   current_time = 0
   X = N - a
@@ -14,7 +14,9 @@ SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
   I = (N - a + 1):N #' Set of Infectives
 
   #' Infection Matrix
-  B = kernel(beta)
+  if(!missing(kernel)){
+    B = kernel(beta)
+  }
 
   event_table = data.frame(matrix(NA, nrow = 2*N + 1, ncol = 4))
   colnames(event_table) = c("ID", "time", "state", "prev_state")
@@ -31,63 +33,67 @@ SIS_Gillespie = function(N, a, gamma, beta, kernel, obs_end){
 
     old_time = current_time
 
-    reduced_B = B[I,S, drop = F]
+    if(!missing(kernel)){
+      reduced_B = B[I,S, drop = F]
+    }
 
     if(X[no_event] == 0){
       individual_inf_rate = 0
     } else{
-      individual_inf_rate = Matrix::colSums(reduced_B)
+      if(!missing(kernel)){
+        individual_inf_rate = Matrix::colSums(reduced_B)
+      } else{
+        individual_inf_rate = rep(Y[no_event]*beta, X[no_event])
+      }
     }
 
     total_inf_pressure = sum(individual_inf_rate)
     total_rem_rate = Y[no_event]*gamma
     rate_next_event = total_rem_rate + total_inf_pressure
-    time_to_next_event = rexp(1, rate_next_event)
+
+    if(missing(E)){
+      time_to_next_event = rexp(1, rate_next_event)
+    } else{
+      time_to_next_event = E/rate_next_event
+    }
     current_time = current_time + time_to_next_event
 
-    which_event = Heterogeneous_Event(individual_inf_rate, total_rem_rate)
+    event = event.epidemics2(individual_inf_rate, gamma, Y[no_event])
 
-    if(which_event == 0){
+    if(event$event == 1){
       if(length(I) == 1){
         individual = I
       } else{
         individual = sample(I, size = 1)
       }
+      individual = I[event$ID_index]
+
+      I = I[-event$ID_index]
+      S = c(S, individual)
+
       Y[no_event + 1] = Y[no_event] - 1
       X[no_event + 1] = X[no_event] + 1
-      I = I[I != individual]
-      S = c(S, individual)
+
       prev_state = 2
       state = 1
     } else{
-      individual = S[which_event]
-      S = S[-which_event]
+      individual = S[event$ID_index]
+      S = S[-event$ID_index]
       I = c(I, individual)
+
       X[no_event + 1] = X[no_event] - 1
       Y[no_event + 1] = Y[no_event] + 1
+
       prev_state = 1
       state = 2
     }
-    event_table[N + no_event + 1, ] = c(individual, current_time, state, prev_state)
+    event_table[N + no_event, ] = c(individual, current_time, state, prev_state)
     no_event = no_event + 1
   }
   event_table = na.omit(event_table)
-  return(list(event_table = event_table, X = X, Y = Y, kernel = kernel))
+  return(list(event_table = event_table, X = X, Y = Y, kernel = if(!missing(kernel)){
+                                                                  kernel} else{NULL}))
 }
-
-
-#' Samples the event which occurs in an heterogeneous epidemic.
-#' If a removal occurs, the funciton returns 0, which represents
-#' the occurance of a removal
-#' If an infection occurs, the index of the individual who becomes
-#' infected is returned.
-
-Heterogeneous_Event = function(individual_inf_rate, removal_rate){
-  event = sample(c(1:length(individual_inf_rate), 0), size = 1,
-                 prob = c(individual_inf_rate, removal_rate))
-  return(event)
-}
-
 
 # ==== Deterministic ====
 
