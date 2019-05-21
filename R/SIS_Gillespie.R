@@ -3,7 +3,7 @@
 #'
 #'
 
-SIS_Gillespie = function(N, a, gamma, beta, obs_end, kernel, U, E){
+SIS_Gillespie = function(N, a, gamma, beta, obs_end = Inf, kernel, U, E){
 
   current_time = 0
   X = N - a
@@ -54,18 +54,15 @@ SIS_Gillespie = function(N, a, gamma, beta, obs_end, kernel, U, E){
     if(missing(E)){
       time_to_next_event = rexp(1, rate_next_event)
     } else{
-      time_to_next_event = E/rate_next_event
+      time_to_next_event = E[no_event]/rate_next_event
     }
     current_time = current_time + time_to_next_event
 
-    event = event.epidemics2(individual_inf_rate, gamma, Y[no_event])
+    event = event.epidemics(individual_inf_rate, gamma, Y[no_event], U = if(!missing(U)){
+      U[no_event]} else{NULL})
 
     if(event$event == 1){
-      if(length(I) == 1){
-        individual = I
-      } else{
-        individual = sample(I, size = 1)
-      }
+
       individual = I[event$ID_index]
 
       I = I[-event$ID_index]
@@ -89,6 +86,7 @@ SIS_Gillespie = function(N, a, gamma, beta, obs_end, kernel, U, E){
     }
     event_table[N + no_event, ] = c(individual, current_time, state, prev_state)
     no_event = no_event + 1
+    #print(current_time)
   }
   event_table = na.omit(event_table)
   return(list(event_table = event_table, X = X, Y = Y, kernel = if(!missing(kernel)){

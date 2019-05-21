@@ -65,7 +65,6 @@ transition_table.epidemics = function(subject, times, state, prev_state, period,
     start_state = c(prev_state[relevant_events][sapply(X = ID_r_e, function(X) head(which(subject[relevant_events] == X), n = 1))],
                     state_ID_p_e)
 
-
     end_state = c(state[relevant_events][sapply(X = ID_r_e, function(X) tail(which(subject[relevant_events] == X), n = 1))],
                   state_ID_p_e)
   } else{
@@ -73,7 +72,6 @@ transition_table.epidemics = function(subject, times, state, prev_state, period,
 
     end_state = state_ID_p_e
   }
-
 
   trans = state_table(start_state, end_state, state_names, levels)
   #trans = table(start_state, end_state)
@@ -85,7 +83,7 @@ transition_table.epidemics = function(subject, times, state, prev_state, period,
   } else if(output == "freq"){
     trans = as.data.frame(trans)
     #trans_names =  sapply(X = 1:nrow(trans), function(X) paste(trans[X,1:2], sep = "", collapse = ""))
-    return(trans)
+    return(trans$Freq)
   }
 }
 
@@ -112,13 +110,10 @@ panel_data.epidemics = function(subject, times, state, prev_state, state_names, 
     obs_times = seq(T_obs[1], T_obs[2], length = k)
   }
 
-  #time_indices = lapply(i, function(i) which(obs_times[i] < times & times < obs_times[i + 1]))
-
-  i = 1:(length(obs_times) - 1)
-  panel_data = lapply(X = i,
+  panel_data = lapply(X = 1:(length(obs_times) - 1),
                       function(X) transition_table.epidemics(subject, times, state,
                                                              prev_state, obs_times[c(X, X + 1)],
-                                                             levels, state_names))
+                                                             levels, state_names, output = "freq"))
 
   return(panel_data)
 }
