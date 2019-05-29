@@ -3,7 +3,7 @@
 #'
 #'
 
-SIS_Gillespie = function(N, a, gamma, beta, obs_end = Inf, kernel, U, E){
+SIS_Gillespie = function(N, a, beta, gamma, obs_end = Inf, kernel = NULL, U, E){
 
   current_time = 0
   X = N - a
@@ -14,7 +14,7 @@ SIS_Gillespie = function(N, a, gamma, beta, obs_end = Inf, kernel, U, E){
   I = (N - a + 1):N #' Set of Infectives
 
   #' Infection Matrix
-  if(!missing(kernel)){
+  if(!is.null(kernel)){
     B = kernel(beta)
   }
 
@@ -33,14 +33,14 @@ SIS_Gillespie = function(N, a, gamma, beta, obs_end = Inf, kernel, U, E){
 
     old_time = current_time
 
-    if(!missing(kernel)){
+    if(!is.null(kernel)){
       reduced_B = B[I,S, drop = F]
     }
 
     if(X[no_event] == 0){
       individual_inf_rate = 0
     } else{
-      if(!missing(kernel)){
+      if(!is.null(kernel)){
         individual_inf_rate = Matrix::colSums(reduced_B)
       } else{
         individual_inf_rate = rep(Y[no_event]*beta, X[no_event])
@@ -89,8 +89,7 @@ SIS_Gillespie = function(N, a, gamma, beta, obs_end = Inf, kernel, U, E){
     #print(current_time)
   }
   event_table = na.omit(event_table)
-  return(list(event_table = event_table, X = X, Y = Y, kernel = if(!missing(kernel)){
-                                                                  kernel} else{NULL}))
+  return(list(event_table = event_table, X = X, Y = Y, kernel = kernel))
 }
 
 # ==== Deterministic ====

@@ -29,50 +29,6 @@ dHyperGeom = function(x, Y, k, log = TRUE){
   return(sum(mapply(extraDistr::dmvhyper, x, Y, MoreArgs = list(k, log))))
 }
 
-#' lambda, initial_infected, T_obs, k
-#'
-#' @param current_state A list of the current state the Continuous Markov Chain of MCMC
-#'                      is at, i.e parameter values and log density value.
-#' @param MCMC_parameters A list of any extra parameters which are needed to make proposals
-#'                        and/or calculate the log density
-fsMCMC_theta_proposal = function(current_state, lambda){
-
-  #' Current State
-  theta_curr = current_state[[1]]
-  E_curr = current_state[[2]]
-  U_curr = current_state[[3]]
-  logP_curr = current_state[[4]]
-  accept_theta = current_state[[5]]
-  #' Define MCMC Parameters
-  #lambda = MCMC_parameters[[1]]
-  V = current_state[[6]]
-  x = current_state[[7]]
-  N = current_state[[8]]
-  T_obs = current_state[[9]]
-  k = current_state[[10]]
-  initial_infectives = current_state[[11]]
-  no_sampled = current_state[[12]]
-
-  log_theta = log(theta)
-  log_theta_prop = log_theta + mvnfast::rmvn(1, mu = c(0,0), sigma = lambda*V)
-  theta_prop = exp(log_theta_prop)
-
-  Y_prop = Deterministic_Gillespie1(N, initial_infective, theta_prop[1], theta_prop[2], E_curr, U_curr, T_obs, k, store = FALSE)$panel_data
-
-  logP_prop = dHyperGeom(x, Y_prop, no_sampled, log = TRUE)
-
-  log_a = (logP_prop + sum(theta)) - (logP_curr + sum(theta_prop))
-
-  if(log(runif(1)) < log_a){
-    logP_curr = logP_prop
-    theta = theta_prop
-    accept_theta = accept_theta + 1
-  }
-
-  return(list(theta_curr, E_curr, U_curr, logP_curr, accept_theta, V, x, N, T_obs, k,
-              initial_infectives, no_sampled))
-
-}
 
 
 #' Epidemic_fsMCMC MCMC algorithm to make inference on panel data of an epidemic through forward simulation
@@ -92,8 +48,8 @@ fsMCMC_theta_proposal = function(current_state, lambda){
 #' @param thinning_factor
 #'
 
-Epidemic_fsMCMC = function(N, a, x, beta0, gamma0, kernel = NULL, no_draws, s, T_obs, k, lambda, V, no_its,
-                           burn_in = 0, lag_max = NA, thinning_factor = 1){
+fsMCMC.epidemics = function(x, obs_times, N, a, beta0, gamma0, kernel = NULL, no_draws, s, lambda, V, no_its,
+                            burn_in = 0, lag_max = NA, thinning_factor = 1){
 
   Start = as.numeric(Sys.time())
 
@@ -107,12 +63,9 @@ Epidemic_fsMCMC = function(N, a, x, beta0, gamma0, kernel = NULL, no_draws, s, T
   while(logP_curr == -Inf){
     U_curr = runif(no_draws)
     E_curr = rexp(no_draws)
-    if(is.null(kernel)){
-      Y_curr = Deterministic_Gillespie1(N, a, theta_curr[beta_indices], theta_curr[gamma_indices], E_curr, U_curr, T_obs, k, store = FALSE)$panel_data
-    } else{
-      Y_curr = Kernel_Deterministic_Gillespie(N, a, theta_curr[beta_indices], theta_curr[gamma_indices], E_curr, U_curr, T_obs, k, kernel, store = FALSE)$panel_data
-    }
-    logP_curr = dHyperGeom(x, Y_curr, no_sampled, log = TRUE)
+
+    logP_curr = fsMCMC_sim(x, N, a, theta_curr[beta_indices], theta_curr[gamma_indices],
+                           kernel, U_curr, E_curr, obs_times)
   }
 
   #' Create Storage Matrix
@@ -132,13 +85,8 @@ Epidemic_fsMCMC = function(N, a, x, beta0, gamma0, kernel = NULL, no_draws, s, T
     log_theta_prop = log_theta_curr + mvnfast::rmvn(1, mu = c(0,0), sigma = lambda*V)
     theta_prop = exp(log_theta_prop)
 
-    if(is.null(kernel)){
-      Y_prop = Deterministic_Gillespie1(N, a, theta_prop[beta_indices], theta_prop[gamma_indices], E_curr, U_curr, T_obs, k, store = FALSE)$panel_data
-    } else{
-      Y_prop = Kernel_Deterministic_Gillespie(N, a, theta_prop[beta_indices], theta_prop[gamma_indices], E_curr, U_curr, T_obs, k, kernel, store = FALSE)$panel_data
-    }
-
-    logP_prop = dHyperGeom(x, Y_prop, no_sampled, log = TRUE)
+    logP_prop = fsMCMC_sim(x, N, a, theta_prop[beta_indices], theta_prop[gamma_indices],
+                                         kernel, U_curr, E_curr, obs_times)
 
     log_a = (logP_prop + sum(theta_curr)) - (logP_curr + sum(theta_prop))
 
@@ -159,14 +107,8 @@ Epidemic_fsMCMC = function(N, a, x, beta0, gamma0, kernel = NULL, no_draws, s, T
     E_prop[proposal_set] = rexp(s)
     U_prop[proposal_set] = runif(s)
 
-    if(is.null(kernel)){
-      Y_prop = Deterministic_Gillespie1(N, a, theta_curr[beta_indices], theta_curr[gamma_indices], E_prop, U_prop, T_obs, k, store = FALSE)$panel_data
-    } else{
-      Y_prop = Kernel_Deterministic_Gillespie(N, a, theta_curr[beta_indices], theta_curr[gamma_indices], E_prop, U_prop, T_obs, k, kernel, store = FALSE)$panel_data
-    }
-
-    logP_prop = dHyperGeom(x, Y_prop, no_sampled, log = TRUE)
-
+    logP_prop = fsMCMC_sim(x, N, a, theta_curr[beta_indices], theta_curr[gamma_indices],
+                           kernel, U_prop, E_prop, obs_times)
 
     log_u = log(runif(1))
 
@@ -178,8 +120,6 @@ Epidemic_fsMCMC = function(N, a, x, beta0, gamma0, kernel = NULL, no_draws, s, T
       U_curr = U_prop
       accept_RVs = accept_RVs + 1
     }
-
-
     #' Store State
     draws[i+1, ] = c(theta_curr, logP_curr)
   }

@@ -22,6 +22,7 @@ event.epidemics = function(individual_inf_rate, gamma, Y, U = NULL){
   rates = c(individual_inf_rate, rep(gamma,Y))
   total_rate = sum(rates)
   ID_index = sum(cumsum(rates)/total_rate < U) + 1
+
   if(ID_index <= X){
     event = 0
   } else{
