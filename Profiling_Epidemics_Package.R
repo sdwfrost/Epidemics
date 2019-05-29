@@ -10,15 +10,12 @@ a = 0.05*N
 beta = 0.02
 gamma = 0.5
 
-
-
-
 U = runif(2*N - a)
 E = rexp(2*N - a)
 
 obs_times = seq(0, 10, length = 6)
-sim = SIR_Gillespie(N, a, beta, gamma, obs_times = obs_times, output = "event",
-                    U = U, E = E)
+sim = Infectious_Disease_Gillespie(type = "SIS", N, a, beta, gamma, obs_end = 10, obs_times = obs_times, output = "event",
+                                   U = U, E = E)
 
 x = with(sim$event_table, panel_data_new.epidemics(ID, time, state, prev_state,
                                                    subset = c(1:19, 191), obs_times = obs_times))
@@ -27,8 +24,8 @@ s = 2*N - a
 lambda = 3
 V = diag(1, 2)
 
-run = fsMCMC.epidemics(x, obs_times, N, a, beta, gamma, kernel = NULL, no_draws = 2*N - a, s,
-                       lambda, V, no_its = 10000)
+run = fsMCMC.epidemics(type = "SIS", x, obs_times, N, a, beta, gamma, kernel = NULL, no_draws = 2*N - a, s,
+                       lambda, V, no_its = 1000)
 Rprof(NULL)
 summaryRprof(tmp)
 

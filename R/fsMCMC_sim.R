@@ -17,10 +17,12 @@
 #' @param T_obs Period for which the infectious process is observed.
 #' @param k How many point observations are made during T_obs
 
-fsMCMC_sim = function(x, N, a, beta, gamma, kernel, U, E, obs_times){
+fsMCMC_sim = function(type, x, N, a, beta, gamma, kernel, U, E, obs_times){
   prop_obs = sum(x[[1]])
-  Y = SIR_Gillespie(N, a, beta, gamma, obs_end = tail(obs_times, n = 1), kernel = kernel, U = U, E = E,
-                    obs_times = obs_times, output = "panel")$panel_data
+  #Y = SIR_Gillespie(N, a, beta, gamma, obs_end = tail(obs_times, n = 1), kernel = kernel, U = U, E = E,
+  #                  obs_times = obs_times, output = "panel")$panel_data
+  Y = Infectious_Disease_Gillespie(type, N, a, beta, gamma, obs_end = tail(obs_times, n = 1), kernel = kernel, U = U, E = E,
+                                   output = "panel", obs_times = obs_times)$panel_data
   logP = dHyperGeom(x, Y, prop_obs, log = T)
   return(logP)
 }

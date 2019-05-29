@@ -1,6 +1,6 @@
 #'
 #' Forward Simulation MCMC (fsMCMC, Neal & Huang 2015)
-#'
+#' fsMCMC.epidemics function
 #'
 
 #'
@@ -25,12 +25,6 @@
 #' 7. Back to 1
 #'
 
-dHyperGeom = function(x, Y, k, log = TRUE){
-  return(sum(mapply(extraDistr::dmvhyper, x, Y, MoreArgs = list(k, log))))
-}
-
-
-
 #' Epidemic_fsMCMC MCMC algorithm to make inference on panel data of an epidemic through forward simulation
 #' @param N Total size of closed population
 #' @param initial_infective Number of individuals who are initially infected in the population
@@ -48,7 +42,7 @@ dHyperGeom = function(x, Y, k, log = TRUE){
 #' @param thinning_factor
 #'
 
-fsMCMC.epidemics = function(x, obs_times, N, a, beta0, gamma0, kernel = NULL, no_draws, s, lambda, V, no_its,
+fsMCMC.epidemics = function(type, x, obs_times, N, a, beta0, gamma0, kernel = NULL, no_draws, s, lambda, V, no_its,
                             burn_in = 0, lag_max = NA, thinning_factor = 1){
 
   Start = as.numeric(Sys.time())
@@ -64,7 +58,7 @@ fsMCMC.epidemics = function(x, obs_times, N, a, beta0, gamma0, kernel = NULL, no
     U_curr = runif(no_draws)
     E_curr = rexp(no_draws)
 
-    logP_curr = fsMCMC_sim(x, N, a, theta_curr[beta_indices], theta_curr[gamma_indices],
+    logP_curr = fsMCMC_sim(type, x, N, a, theta_curr[beta_indices], theta_curr[gamma_indices],
                            kernel, U_curr, E_curr, obs_times)
   }
 
@@ -85,7 +79,7 @@ fsMCMC.epidemics = function(x, obs_times, N, a, beta0, gamma0, kernel = NULL, no
     log_theta_prop = log_theta_curr + mvnfast::rmvn(1, mu = c(0,0), sigma = lambda*V)
     theta_prop = exp(log_theta_prop)
 
-    logP_prop = fsMCMC_sim(x, N, a, theta_prop[beta_indices], theta_prop[gamma_indices],
+    logP_prop = fsMCMC_sim(type, x, N, a, theta_prop[beta_indices], theta_prop[gamma_indices],
                                          kernel, U_curr, E_curr, obs_times)
 
     log_a = (logP_prop + sum(theta_curr)) - (logP_curr + sum(theta_prop))
@@ -107,7 +101,7 @@ fsMCMC.epidemics = function(x, obs_times, N, a, beta0, gamma0, kernel = NULL, no
     E_prop[proposal_set] = rexp(s)
     U_prop[proposal_set] = runif(s)
 
-    logP_prop = fsMCMC_sim(x, N, a, theta_curr[beta_indices], theta_curr[gamma_indices],
+    logP_prop = fsMCMC_sim(type, x, N, a, theta_curr[beta_indices], theta_curr[gamma_indices],
                            kernel, U_prop, E_prop, obs_times)
 
     log_u = log(runif(1))

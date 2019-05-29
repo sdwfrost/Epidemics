@@ -15,7 +15,7 @@
 
 
 event.epidemics = function(individual_inf_rate, gamma, Y, U = NULL){
-  if(is.null(U)){
+  if(is.null(U) | is.logical(is.na(U))){
     U = runif(1, 0, 1)
   }
   X = length(individual_inf_rate)
