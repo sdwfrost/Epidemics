@@ -48,12 +48,4 @@ Spatial_Kernel = function(coord_matrix){
   }
 }
 
-Household_Kernel = function(households){
-  household_matrix = 1*sapply(1:length(households), function(X) households[X] == households)
-  #household_matrix = as(household_matrix, "sparseMatrix")
-  function(par){
-    par[1]*par[2]^(household_matrix)
-  }
-}
-
 
