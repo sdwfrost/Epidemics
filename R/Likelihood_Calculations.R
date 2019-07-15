@@ -35,7 +35,7 @@ prod_part_inf = function(t_inf_j, events, B, log = TRUE){
   is_infected = t_inf_j < Inf
   waifw = sapply(t_inf_j, function(t) events[is_infected, 1] < t & t < events[is_infected, 2])
   lambdaj = colSums(B[is_infected, is_infected] * waifw[,is_infected])
-  t_inf_0 = which.min(t_inf_j[is_infected])
+  t_inf_0 = which(t_inf_j[is_infected] == min(t_inf_j[is_infected]))
   if(log){
     sum(log(lambdaj[-t_inf_0]))
   } else{
@@ -99,7 +99,7 @@ log_likelihood_inf = function(par, t_inf, t_rem, kernel){
 
 log_likelihood_rem = function(par, t_inf, t_rem){
   i_removed = which(t_rem < Inf)
-  llh = sum(dgamma(t_rem[i_removed] - t_inf[i_removed], rate = par[1], shape = par[2], log = TRUE))
+  llh = sum(dgamma(t_rem[i_removed] - t_inf[i_removed], rate = par, shape = 1, log = TRUE))
   return(llh)
 }
 
@@ -108,7 +108,7 @@ log_likelihood_rem = function(par, t_inf, t_rem){
 
 #' Computes the full epidemic likelihood
 
-epidemic_loglikelihood = function(par_rem, par_inf, t_inf, t_rem, kernel){
+epidemic_loglikelihood = function(par_inf, par_rem, t_inf, t_rem, kernel){
   return(log_likelihood_rem(par_rem, t_inf, t_rem) + log_likelihood_inf(par_inf, t_inf, t_rem, kernel))
 }
 

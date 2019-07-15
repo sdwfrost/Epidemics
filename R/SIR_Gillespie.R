@@ -23,7 +23,6 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
     B = kernel(beta)
   }
 
-
   if(output == "panel"){
     event_table = NULL
     panel_data = lapply(rep(NA, length(obs_times)), function(X) return(X))
@@ -35,7 +34,7 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
                                     nrow = N - a, ncol = 4, byrow = FALSE)
     event_table[(N - a + 1):N, ] = matrix(c((N - a + 1):N, rep(0, a), rep(2, a), rep(2, a)),
                                           nrow = a, ncol = 4, byrow = FALSE)
-    colnames(event_table) = c("ID", "time", "state", "prev_state")
+    colnames(event_table) = c("ID", "times", "state", "prev_state")
   }
 
   no_event = 1
@@ -48,7 +47,7 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
     }
 
     if(X[no_event] == 0){
-      individual_inf_rate = 0
+      individual_inf_rate = numeric(0)
     } else{
       if(!is.null(kernel)){
         individual_inf_rate = Matrix::colSums(reduced_B)
@@ -89,7 +88,6 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
 
     event = event.epidemics(individual_inf_rate, gamma, Y[no_event], if(!missing(U)){
                                                              U[no_event]} else{NULL})
-
     if(event$event == 1){
       individual = I[event$ID_index]
       I = I[-event$ID_index]

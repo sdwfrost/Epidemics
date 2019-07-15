@@ -3,47 +3,55 @@
 #'
 tmp = tempfile()
 Rprof(tmp, interval = 0.01)
-set.seed(1)
-
+set.seed(3)
 N = 200
 a = 0.05*N
 beta = 0.02
 gamma = 0.5
 
+obs_times = seq(0, 10, length = 10)
+
 U = runif(2*N - a)
 E = rexp(2*N - a)
-
-obs_times = seq(0, 10, length = 6)
-sim = Infectious_Disease_Gillespie(type = "SIS", N, a, beta, gamma, obs_end = 10, obs_times = obs_times, output = "event",
+sim = Infectious_Disease_Gillespie(type = "SIR", N, a, beta, gamma, obs_end = tail(obs_times, n = 1), output = "event",
                                    U = U, E = E)
-
-x = with(sim$event_table, panel_data_new.epidemics(ID, time, state, prev_state,
+attach(sim)
+par(mfrow  = c(1,1))
+plot.epidemic(event_table$times, N, X, Y, Z)
+detach(sim)
+x = with(sim$event_table, panel_data_new.epidemics(ID, times, state, prev_state,
                                                    subset = c(1:19, 191), obs_times = obs_times))
 
 s = 2*N - a
 lambda = 3
 V = diag(1, 2)
 
-run = fsMCMC.epidemics(type = "SIS", x, obs_times, N, a, beta, gamma, kernel = NULL, no_draws = 2*N - a, s,
-                       lambda, V, no_its = 1000)
+run = fsMCMC.epidemics(type = "SIR", x, obs_times, N, a, beta, gamma, kernel = NULL, no_draws = 2*N - a, s,
+                       lambda, V, no_its = 10000)
 Rprof(NULL)
-summaryRprof(tmp)
-
-fsMCMC_sim()
-
-state(S, I, R)
-
-start_state
-end_state
+summaryRprof(tmp)$by.self
+summaryRprof(tmp)$sampling.time
 
 
 tmp = tempfile()
 Rprof(tmp, interval = 0.01)
-no_reps = 7800000
-U = runif(no_reps)
-Y = 10
-beta = 0.02
+X = 95
+Y = 5
+individual_inf_rate = rep(0.01*Y, X)
+
 gamma = 0.5
+for(i in 1:1e6){
+  #event_epidemicsC(individual_inf_rate, gamma, Y, U = NaN)
+  event.epidemics(individual_inf_rate, gamma, Y)
+}
+#bench::mark(event_epidemicsC(individual_inf_rate, gamma, Y, U),
+#            event.epidemics(individual_inf_rate, gamma, Y, U))
+
+Rprof(NULL)
+summaryRprof(tmp)$by.self
+summaryRprof(tmp)$sampling.time
+
+
 individual_inf_rate = rep(beta, 190)
 for(j in 1:no_reps){
   if(is.null(U[j])){
@@ -62,26 +70,38 @@ for(j in 1:no_reps){
   }
 }
 
+microbenchmark::microbenchmark(scan(text = "1 2 3", quiet = T))
+
+beta  = 0.01
+individual_inf_rate = rep(beta, 190)
+Y = 10
+gamma = 0.5
+
+microbenchmark::microbenchmark(event.epidemics(individual_inf_rate, gamma, Y), event.epidemics2(),
+                               times = 10000)
+
+tmp = tempfile()
+Rprof(tmp, interval = 0.001)
+
+no_reps = 1:10000000
+U = NULL
+Y = 10
+beta = 0.02
+individual_inf_rate = rep(beta, 190)
+gamma = 0.5
+
+for(i in no_reps){
+  #event.epidemics(individual_inf_rate, gamma, Y)
+  #event.epidemics2()
+  Y = 10
+  beta = 0.02
+  individual_inf_rate = rep(beta, 190)
+  gamma = 0.5
+}
+
 Rprof(NULL)
-summaryRprof(tmp)
-prev_state = c(1, 1, 1, 2, 2, 2, 3, 3, 3, 1, 2, 3, 1)
-state      = c(1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 3, 3, 1)
-
-possible_trans = as.character(c(11, 12, 13, 22, 23, 33))
-
-x = rep(c(1,2,3,1), 50)
-y = rep(c(2,3,3,1), 50)
-
-x = as.character(x)
-y = as.character(y)
-transitions = mapply(function(x, y) paste(x, y, sep = ""), x, y)
-freq = sapply(X = possible_trans, function(X) sum(X == transitions))
-
-transitions = Vectorize(function(x, y) paste(c(x, y), sep = return)
-
-?vectorize
-
-
+summaryRprof(tmp)$by.self
+summaryRprof(tmp)$sampling.time
 S = 1:95
 I = 96:100
 R = NULL
@@ -127,8 +147,6 @@ E = rexp(2*N[1] - a[1])
 
 max_events = 2*N[1] - a[1]
 x = 1:max_events
-
-
 
 end_state(subject, state)
 
