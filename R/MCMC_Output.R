@@ -10,7 +10,7 @@
 
 #' Trace and ACF plotting function
 
-MCMCplots = function(samples, lagMax = NA, ylab, set.mfrow = FALSE){
+MCMCplots = function(samples, lagMax = NA, ylab, trueValue = NULL, set.mfrow = FALSE){
 
   if(set.mfrow){
     par(mfrow = c(1,2))
@@ -21,6 +21,14 @@ MCMCplots = function(samples, lagMax = NA, ylab, set.mfrow = FALSE){
 
   # ACF
   acf(samples, lagMax, ylab = ylab)
+
+  #' Density Plot
+
+  plot(density(samples), type = 'l', col = 'blue')
+
+  if(!is.null(trueValue)){
+    abline(v = trueValue)
+  }
 
 }
 
