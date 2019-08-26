@@ -14,8 +14,8 @@ while(final_size == 0){
   final_size = epidemic$final_size
 }
 
-run = Centered_MCMC(N, a, epidemic$t_rem, gamma, c(1, 0.001), beta, c(1, 0.001), kernel, no_proposals = 5, no_its = 10000,
-              burn_in = 1000)
+run = Centered_MCMC(N, a, epidemic$t_rem, 0.5, c(1, 0.001), beta, c(1, 0.001), kernel, no_proposals = 5, no_its = 10000,
+                    burn_in = 1000)
 
 # =========================================== Testing Non-centered MCMC
 

@@ -111,8 +111,8 @@ Centered_MCMC = function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, ke
   while(sum(colSums(waifw) > 0) != n_R - 1){
 
     # Widen infectious periods
-    inf_period <- inf_period*1.1
-
+    #inf_period <- inf_period*1.1
+    inf_period[which_infected] <- rexp(n_R, rate = gamma)
     # Calculate new infection times
     t_inf <- t_rem - inf_period
 
