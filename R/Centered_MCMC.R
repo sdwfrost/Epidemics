@@ -99,7 +99,7 @@ Centered_MCMC = function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, ke
   t_inf <- rep(Inf, N)
 
   # Draw infectious periods
-  inf_period[which_infected] <- rexp(n_I, rate = gamma)
+  inf_period[which_infected] <- rexp(n_R, rate = gamma)
 
   # Calculate infection times
   t_inf <- t_rem - inf_period
