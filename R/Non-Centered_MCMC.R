@@ -39,8 +39,9 @@
 
 # ==== Non-Centered Algorithm ====
 
-NonCentered_MCMC <- function(N, t_rem, gamma0, alpha = 1, theta_gamma, beta0, theta_beta, kernel, no_its,
-                         burn_in = 0, no_proposals, lambda, thinning_factor = 1, lag_max = NA){
+NonCentered_MCMC <- function(N, t_rem, gamma0, theta_gamma, beta0, theta_beta, kernel, no_its,
+                             burn_in = 0, no_proposals, lambda,
+                             PLOT = TRUE, thinning_factor = 1, lag_max = NA){
 
   # ==== Initialise ====
 
@@ -49,7 +50,7 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, alpha = 1, theta_gamma, beta0, th
 
   # Number of people who were removed
   n_R <- sum(t_rem < Inf)
-  n_I <- n_R # For finished Epidemic n_I = n_R
+  n_I <- n_R - a # For finished Epidemic n_I = n_R
 
   # Which individuals got infected?
   which_infected <- which(t_rem < Inf)
@@ -66,7 +67,7 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, alpha = 1, theta_gamma, beta0, th
   t_inf <- rep(Inf, N)
 
   # Draw infectious periods
-  inf_period[which_infected] <- rgamma(n_I, rate = gamma, shape = alpha)
+  inf_period[which_infected] <- rexp(n_R, rate = gamma)
 
   # Calculate infection times
   t_inf <- t_rem - inf_period
@@ -75,7 +76,7 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, alpha = 1, theta_gamma, beta0, th
 
   waifw = sapply(t_inf[which_infected], function(t) cbind(t_inf, t_rem)[which_infected, 1] < t & t < cbind(t_inf, t_rem)[which_infected, 2])
 
-  while(sum(colSums(waifw) > 0) != n_I - 1){
+  while(sum(colSums(waifw) > 0) != n_R - 1){
 
     # Widen infectious periods
     inf_period <- inf_period*1.1
@@ -173,7 +174,7 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, alpha = 1, theta_gamma, beta0, th
     # = Accept/Reject =
 
     log_a <- (loglikelihood_prop + sum(dgamma(U[proposed_infected], rate = gamma, shape = alpha, log = TRUE))) -
-      (loglikelihood + sum(dgamma(U_prop[proposed_infected], rate = gamma, shape = alpha, log = TRUE)))
+      (loglikelihood + sum(dexp(U_prop[proposed_infected], rate = gamma, log = TRUE)))
 
     log_u <- log(runif(1))
 
@@ -202,24 +203,25 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, alpha = 1, theta_gamma, beta0, th
 
   # = Plots =
   par(mfrow = c(2,2))
+  if(PLOT){
+    # Plot Beta Samples and Sample Auto-Corrolation Function
+    if(is.na(lag_max)){
+      # Beta
+      plot(draws[, 1], type = 'l')
+      acf(draws[, 1])
 
-  # Plot Beta Samples and Sample Auto-Corrolation Function
-  if(is.na(lag_max)){
-    # Beta
-    plot(draws[, 1], type = 'l')
-    acf(draws[, 1])
+      # Gamma
+      plot(draws[, 2], type = 'l')
+      acf(draws[, 2])
+    } else{
+      # Beta
+      plot(draws[, 1], type = 'l')
+      acf(draws[, 1], lag_max)
 
-    # Gamma
-    plot(draws[, 2], type = 'l')
-    acf(draws[, 2])
-  } else{
-    # Beta
-    plot(draws[, 1], type = 'l')
-    acf(draws[, 1], lag_max)
-
-    # Gamma
-    plot(draws[, 2], type = 'l')
-    acf(draws[, 2], lag_max)
+      # Gamma
+      plot(draws[, 2], type = 'l')
+      acf(draws[, 2], lag_max)
+    }
   }
 
   # Calculating Summary Statistics for samples

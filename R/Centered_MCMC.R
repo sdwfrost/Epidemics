@@ -77,7 +77,7 @@ inf_time_proposal = function(t_inf, t_rem, no_proposals, par_rem){
 }
 
 Centered_MCMC = function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, kernel, no_proposals, no_its, burn_in,
-                               thinning_factor = 1, lag_max = NA){
+                         PLOT = TRUE, thinning_factor = 1, lag_max = NA){
   Start <- as.numeric(Sys.time())
   # == Initialise ==
 
@@ -108,7 +108,7 @@ Centered_MCMC = function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, ke
 
   waifw = sapply(t_inf[which_infected], function(t) cbind(t_inf, t_rem)[which_infected, 1] < t & t < cbind(t_inf, t_rem)[which_infected, 2])
 
-  while(sum(colSums(waifw) > 0) != n_I - 1){
+  while(sum(colSums(waifw) > 0) != n_R - 1){
 
     # Widen infectious periods
     inf_period <- inf_period*1.1
@@ -117,6 +117,7 @@ Centered_MCMC = function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, ke
     t_inf <- t_rem - inf_period
 
     waifw = sapply(t_inf[which_infected], function(t) cbind(t_inf, t_rem)[which_infected, 1] < t & t < cbind(t_inf, t_rem)[which_infected, 2])
+    print(sum(colSums(waifw) > 0))
   }
 
   # Calculate components of posterior parameters for beta and the likelihood
@@ -235,4 +236,8 @@ Centered_MCMC = function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, ke
   return(list(draws = draws, accept_rate = accept_rate, ESS = ESS, ESS_sec = ESS_sec, beta_summary = beta_summary,
               gamma_summary = gamma_summary, R0_summary = R0_summary, time_taken = time_taken))
 }
+
+
+
+
 
