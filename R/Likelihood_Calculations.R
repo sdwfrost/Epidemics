@@ -31,16 +31,32 @@
 # A matrix which tells us who was exerting pressure on an individual
 # when they became infected.
 
+
 prod_part_inf = function(t_inf_j, events, B, log = TRUE){
   is_infected = t_inf_j < Inf
-  waifw = sapply(t_inf_j, function(t) events[is_infected, 1] < t & t < events[is_infected, 2])
-  lambdaj = colSums(B[is_infected, is_infected] * waifw[,is_infected])
-  t_inf_0 = which.min(t_inf_j[is_infected])
-  if(log){
-    sum(log(lambdaj[-t_inf_0]))
+
+  if(length(B) == 1){
+    t_inf_0 = which(t_inf_j[is_infected] == min(t_inf_j[is_infected]))
+    n_I = sum(is_infected) - sum(length(t_inf_0))
+    waifw = sapply(t_inf_j, function(t) events[is_infected, 1] < t & t < events[is_infected, 2])
+    Yj = colSums(waifw[,is_infected])[-t_inf_0]
+    if(log){
+      return(n_I*log(B) + sum(log(Yj)))
+    } else{
+      return((B^(n_I))*prod(Yj))
+    }
   } else{
-    prod(lambdaj[-t_inf_0])
+    waifw = sapply(t_inf_j, function(t) events[is_infected, 1] < t & t < events[is_infected, 2])
+    lambdaj = colSums(B[is_infected, is_infected] * waifw[,is_infected])
+    t_inf_0 = which(t_inf_j[is_infected] == min(t_inf_j[is_infected]))
+    if(log){
+      return(sum(log(lambdaj[-t_inf_0])))
+    } else{
+      return(prod(lambdaj[-t_inf_0]))
+    }
   }
+
+
 }
 
 # ==== Infection Integral ====
@@ -72,7 +88,11 @@ integral_part_inf = function(B, events, t_inf_j, with.beta = TRUE){
   i_infected = events[,1] < Inf
   E = interval_intersect(events[i_infected,], cbind(min(t_inf_j), t_inf_j))
   if(with.beta){
-    integral  = E*B[i_infected,]
+    if(length(B) == 1){
+      integral = E*B
+    } else{
+      integral  = E*B[i_infected,]
+    }
     sum(integral)
   } else{
     integral = E
@@ -83,7 +103,14 @@ integral_part_inf = function(B, events, t_inf_j, with.beta = TRUE){
 #' @func log_likelihood_inf, calculates the infectious process part of an epidemic likelihood
 
 log_likelihood_inf = function(par, t_inf, t_rem, kernel){
-  B = kernel(par)
+  if(missing(kernel)){
+    if(length(par) > 1){
+      stop("Beta parameter must be length 1 if no kernel is present")
+    }
+    B = par
+  } else{
+    B = kernel(par)
+  }
   prod = prod_part_inf(t_inf, cbind(t_inf, t_rem), B)
   integral = integral_part_inf(B, cbind(t_inf, t_rem), t_inf)
   return(prod - integral)
@@ -99,7 +126,7 @@ log_likelihood_inf = function(par, t_inf, t_rem, kernel){
 
 log_likelihood_rem = function(par, t_inf, t_rem){
   i_removed = which(t_rem < Inf)
-  llh = sum(dgamma(t_rem[i_removed] - t_inf[i_removed], rate = par[1], shape = par[2], log = TRUE))
+  llh = sum(dgamma(t_rem[i_removed] - t_inf[i_removed], rate = par, shape = 1, log = TRUE))
   return(llh)
 }
 
@@ -108,7 +135,7 @@ log_likelihood_rem = function(par, t_inf, t_rem){
 
 #' Computes the full epidemic likelihood
 
-epidemic_loglikelihood = function(par_rem, par_inf, t_inf, t_rem, kernel){
+epidemic_loglikelihood = function(par_inf, par_rem, t_inf, t_rem, kernel){
   return(log_likelihood_rem(par_rem, t_inf, t_rem) + log_likelihood_inf(par_inf, t_inf, t_rem, kernel))
 }
 

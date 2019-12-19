@@ -76,14 +76,14 @@ inf_time_proposal = function(t_inf, t_rem, no_proposals, par_rem){
   return(t_inf_prop)
 }
 
-Centered_MCMC = function(N, t_rem, gamma0, theta_gamma, alpha = 1, beta0, theta_beta, kernel, no_proposals, no_its, burn_in,
-                               thinning_factor = 1, lag_max = NA){
+Centered_MCMC = function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, kernel, no_proposals, no_its, burn_in,
+                         PLOT = TRUE, thinning_factor = 1, lag_max = NA){
   Start <- as.numeric(Sys.time())
   # == Initialise ==
 
   # Number of people who were removed
   n_R <- sum(t_rem < Inf)
-  n_I <- n_R # For finished Epidemic n_I = n_R
+  n_I <- n_R - a # For finished Epidemic n_I = n_R
 
   # Which individuals got infected?
   which_infected <- which(t_rem < Inf)
@@ -99,25 +99,25 @@ Centered_MCMC = function(N, t_rem, gamma0, theta_gamma, alpha = 1, beta0, theta_
   t_inf <- rep(Inf, N)
 
   # Draw infectious periods
-  inf_period[which_infected] <- rgamma(n_I, rate = gamma, shape = alpha)
+  inf_period[which_infected] <- rexp(n_R, rate = gamma)
 
   # Calculate infection times
   t_inf <- t_rem - inf_period
 
   # == Checking validity of drawn infection times ==
 
-
   waifw = sapply(t_inf[which_infected], function(t) cbind(t_inf, t_rem)[which_infected, 1] < t & t < cbind(t_inf, t_rem)[which_infected, 2])
 
-  while(sum(colSums(waifw) > 0) != n_I - 1){
+  while(sum(colSums(waifw) > 0) != n_R - 1){
 
     # Widen infectious periods
     inf_period <- inf_period*1.1
-
+    #inf_period[which_infected] <- rexp(n_R, rate = gamma)
     # Calculate new infection times
     t_inf <- t_rem - inf_period
 
     waifw = sapply(t_inf[which_infected], function(t) cbind(t_inf, t_rem)[which_infected, 1] < t & t < cbind(t_inf, t_rem)[which_infected, 2])
+    print(sum(colSums(waifw) > 0))
   }
 
   # Calculate components of posterior parameters for beta and the likelihood
@@ -150,8 +150,8 @@ Centered_MCMC = function(N, t_rem, gamma0, theta_gamma, alpha = 1, beta0, theta_
     # Update beta and gamma by drawing from their conditional posteriors
 
     # Exponential Prior ---> Gamma Posterior
-    gamma <-  rgamma(1, shape = n_R*alpha + 1, rate = theta_gamma + RP_integral)
-    beta  <-  rgamma(1, shape = (n_I - 1) + 1, rate = theta_beta + IP_integral)
+    gamma <-  rgamma(1, shape = n_R + theta_gamma[1], rate = theta_gamma[2] + RP_integral)
+    beta  <-  rgamma(1, shape = n_I + theta_beta[1], rate = theta_beta[2] + IP_integral)
 
     loglikelihood_inf = log_likelihood_inf(beta, t_inf, t_rem, kernel)
 
@@ -163,7 +163,7 @@ Centered_MCMC = function(N, t_rem, gamma0, theta_gamma, alpha = 1, beta0, theta_
     proposed_infected <- sample(which_infected, no_proposals)
 
     # Propose a new infectious period
-    inf_period_prop <- rgamma(no_proposals, rate = gamma, shape = alpha)
+    inf_period_prop <- rexp(no_proposals, rate = gamma)
 
     # Use this to calculate the new infection time
     t_inf_prop <- t_inf
@@ -200,37 +200,44 @@ Centered_MCMC = function(N, t_rem, gamma0, theta_gamma, alpha = 1, beta0, theta_
   # Calculate Effective Sample Sizes (and Per Second) and Acceptance Rates
   ESS <- c(coda::effectiveSize(draws[, 1:2]), coda::effectiveSize(R0_samples))
   ESS_sec <- ESS/time_taken
-  accept_rate <-  accept/no_its
+  accept_rate <- accept/no_its
 
   # = Plots =
   par(mfrow = c(2,2))
 
-  # Plot Beta Samples and Sample Auto-Corrolation Function
-  if(is.na(lag_max)){
-    # Beta
-    plot(draws[, 1], type = 'l')
-    acf(draws[, 1])
+  if(PLOT){
+    # Plot Beta Samples and Sample Auto-Corrolation Function
+    if(is.na(lag_max)){
+      # Beta
+      plot(draws[, 1], type = 'l')
+      acf(draws[, 1])
 
-    # Gamma
-    plot(draws[, 2], type = 'l')
-    acf(draws[, 2])
-  } else{
-    # Beta
-    plot(draws[, 1], type = 'l')
-    acf(draws[, 1], lag_max)
+      # Gamma
+      plot(draws[, 2], type = 'l')
+      acf(draws[, 2])
+    } else{
+      # Beta
+      plot(draws[, 1], type = 'l')
+      acf(draws[, 1], lag_max)
 
-    # Gamma
-    plot(draws[, 2], type = 'l')
-    acf(draws[, 2], lag_max)
+      # Gamma
+      plot(draws[, 2], type = 'l')
+      acf(draws[, 2], lag_max)
+    }
+
   }
 
   # Calculating Summary Statistics for samples
-  beta_summary = c(mean(draws[,1]), sd(draws[,1]))
-  gamma_summary = c(mean(draws[,2]), sd(draws[,2]))
-  R0_summary = c(mean(R0_samples), sd(R0_samples))
+  beta_summary = c(mean(draws[,1]), var(draws[,1]))
+  gamma_summary = c(mean(draws[,2]), var(draws[,2]))
+  R0_summary = c(mean(R0_samples), var(R0_samples))
 
-  printed_output(rinf_dist = "Gamma", no_proposals, no_its, ESS, time_taken, ESS_sec, accept_rate)
+  printed_output(rinf_dist = "Exp", no_proposals, no_its, ESS, time_taken, ESS_sec, accept_rate)
   return(list(draws = draws, accept_rate = accept_rate, ESS = ESS, ESS_sec = ESS_sec, beta_summary = beta_summary,
               gamma_summary = gamma_summary, R0_summary = R0_summary, time_taken = time_taken))
 }
+
+
+
+
 

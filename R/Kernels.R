@@ -7,8 +7,8 @@
 # ==== Homogeneous Kernels ====
 
 Homogeneous_Kernel = function(N){
-  function(parameters){
-    parameters
+  function(inf_par){
+    inf_par
   }
 }
 
@@ -25,7 +25,7 @@ Contact_Kernel = function(contact_matrix, SYM = TRUE){
   if(SYM == TRUE){
     contact_matrix[lower.tri(contact_matrix)] = Matrix::t(contact_matrix)[lower.tri(contact_matrix)]
   }
-  contact_matrix = as(contact_matrix, "sparseMatrix")
+  #contact_matrix = as(contact_matrix, "sparseMatrix")
   function(beta){
     beta*contact_matrix
   }
@@ -47,14 +47,5 @@ Spatial_Kernel = function(coord_matrix){
     par[1]*exp(-distance_matrix/par[2])
   }
 }
-
-Household_Kernel = function(households){
-  household_matrix = 1*sapply(1:length(households), function(X) households[X] == households)
-  household_matrix = as(household_matrix, "sparseMatrix")
-  function(par){
-    par[1] + par[2]*household_matrix
-  }
-}
-
 
 

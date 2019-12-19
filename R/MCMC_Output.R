@@ -6,6 +6,35 @@
 
 # ==== Preamble ====
 
+
+
+#' Trace and ACF plotting function
+
+MCMCplots = function(samples, lagMax = NA, ylab, trueValue = NULL, set.mfrow = FALSE){
+
+  if(set.mfrow){
+    par(mfrow = c(1,2))
+  }
+
+  #' Trace Plot
+  plot(samples, type = 'l', ylab = ylab)
+
+  # ACF
+  acf(samples, lagMax, ylab = ylab)
+
+  #' Density Plot
+
+  plot(density(samples), type = 'l', col = 'blue')
+
+  if(!is.null(trueValue)){
+    abline(v = trueValue)
+  }
+
+}
+
+
+
+
 # ==== Printed Output for an MCMC run ====
 
 printed_output <- function(rinf_dist, no_proposals, no_its, ESS, time_taken, ESS_sec, accept_rate){

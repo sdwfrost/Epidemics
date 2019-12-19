@@ -39,7 +39,7 @@ interval_transitions = function(interval, event_times){
   # Transitions from removal state
   n_rr = sum(event_times[,2] < interval[1])
 
-  return(c(n_ss = n_ss, n_si = n_si, n_sr = n_sr, n_ii = n_ii, n_ir = n_ir, n_rr = n_rr))
+  return(c(n_ss = n_ss, n_is = 0, n_rs = 0, n_si = n_si, n_ii = n_ii, n_ri = 0, n_sr = n_sr, n_ir = n_ir, n_rr = n_rr))
 }
 
 

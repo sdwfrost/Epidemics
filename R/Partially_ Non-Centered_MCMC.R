@@ -8,55 +8,55 @@
 
 # ==== Partially Non-Centered Sampling Algorithm ====
 
-PNC.Algorithm <- function(N, R, gamma0, beta0, gamma.prior, theta.gamma, beta.prior, theta.beta,
-                          rinf.dist, alpha, no.proposals, lambda, centering.prob, no.its, burn.in, thinning.factor = 1,
-                          lag.max = NA){
+PNC.Algorithm <- function(N, a, t_rem, gamma0, beta0, theta.gamma, theta.beta,
+                          rinf.dist, no_proposals, lambda, centering_prob, no_its, burn_in, thinning_factor = 1,
+                          lag_max = NA){
 
   # Starting Time
   Start <- as.numeric(Sys.time())
 
-
-  # Check that a suitable amount of hyperparameters have been specified for the priors
-  # of gamma and beta.
-  if(((gamma.prior == "gamma" & length(theta.gamma) != 2) |
-      (gamma.prior == "exp" & length(theta.gamma) != 1))|
-     ((beta.prior == "gamma" & length(theta.beta) != 2) |
-      (beta.prior == "exp" & length(theta.beta) != 1))){
-    stop("Number of prior hyperparameters specified does not match
-         the number required for the prior assigned to beta/gamma")
-  }
-
-  # Number of people who were removed.
-  n_R <- sum(R < 10000)
-
-  # For finished epidemics, the number of people who were infected
-  # is equal to the number who were removed.
-  #n_I <- sum(I < 10000)
-  n_I <- n_R
+  # Number of people who were removed
+  n_R <- sum(t_rem < Inf)
+  n_I <- n_R - a # For finished Epidemic n_I = n_R
 
   # Which individuals got infected?
-  infected <- which(R < 10000)
+  which_infected <- which(t_rem < Inf)
 
-  # Rescale so that first removal time is at t = 0
-  # This time is when the epidemic would
-  # begin to be observed, in reality
-  R[infected] <- R[infected] - min(R[infected])
+  # Rescale
+  t_rem <- t_rem - min(t_rem)
 
   # Initialise Beta and Gamma Values
   beta <- beta0
   gamma <- gamma0
 
-  Q <- rep(0, N)
-  I <- rep(10000, N)
+  inf_period <- rep(0, N)
+  t_inf <- rep(Inf, N)
+
   # Draw infectious periods
-  Q[infected] <- rinf.period(n = n_I, dist = rinf.dist,
-                             theta = switch(rinf.dist,
-                                            exp = gamma, gamma = c(gamma, alpha),
-                                            weibull = c(gamma, alpha)))
+  inf_period[which_infected] <- rexp(n_I, rate = gamma)
+
+  # Calculate infection times
+  t_inf <- t_rem - inf_period
+
+
+  # == Checking validity of drawn infection times ==
+
+  waifw = sapply(t_inf[which_infected], function(t) cbind(t_inf, t_rem)[which_infected, 1] < t & t < cbind(t_inf, t_rem)[which_infected, 2])
+
+  while(sum(colSums(waifw) > 0) != n_I - 1){
+
+    # Widen infectious periods
+    inf_period <- inf_period*1.1
+
+    # Calculate new infection times
+    t_inf <- t_rem - inf_period
+
+    waifw = sapply(t_inf[which_infected], function(t) cbind(t_inf, t_rem)[which_infected, 1] < t & t < cbind(t_inf, t_rem)[which_infected, 2])
+  }
 
   # Use these infectious periods and the known removal times to
   # to calculate infection times.
-  I <- R - Q
+  t_inf <- t_rem - inf_period
 
   # == Checking validity of drawn infection times ==
 

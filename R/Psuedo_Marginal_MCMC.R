@@ -18,25 +18,27 @@
 #' @param kernel,
 
 
-pi_Y_given_X = function(N, Y, k, T_obs, initial_infective, beta, gamma){
+pi_Y_given_X = function(N, Y, obs_times, initial_infective, beta, gamma){
 
   no_sampled = sum(Y[[1]])
 
-  X = Epidemic_Gillespie(N, initial_infective, gamma, beta, k, T_obs)$panel_data
+  U = runif(2*N - initial_infective)
+  E = rexp(2*N - initial_infective)
+  X = SIR_Gillespie(N, initial_infective, beta, gamma, U = U, E = E, output = "panel", obs_times = obs_times)$panel_data
 
   pi_Y_X = prod(mapply(extraDistr::dmvhyper, Y, X, MoreArgs = list(k = no_sampled)))
 
   return(pi_Y_X)
 }
 
-pi_Y_given_theta_hat = function(no_sims, N, Y, k, T_obs, initial_infective, beta, gamma, parallel = FALSE, no_cores = 2){
+pi_Y_given_theta_hat = function(no_sims, N, Y, obs_times, initial_infective, beta, gamma, parallel = FALSE, no_cores = 2){
   if(parallel){
     pi_Y_X_i = parallel::mcmapply(1:no_sims,
-                                 FUN =  function(X) return(pi_Y_given_X(N, Y, k, T_obs, initial_infective, beta, gamma)),
+                                 FUN =  function(X) return(pi_Y_given_X(N, Y, obs_times, initial_infective, beta, gamma)),
                                  mc.cores = no_cores)
 
   } else{
-    pi_Y_X_i = replicate(no_sims, pi_Y_given_X(N, Y, k, T_obs, initial_infective, beta, gamma))
+    pi_Y_X_i = replicate(no_sims, pi_Y_given_X(N, Y, obs_times, initial_infective, beta, gamma))
   }
   return(mean(pi_Y_X_i))
 }
@@ -46,7 +48,7 @@ pi_Y_given_theta_hat = function(no_sims, N, Y, k, T_obs, initial_infective, beta
 
 
 
-Pseudo_Marginal_MCMC = function(N, Y, k, T_obs, beta0, gamma0, prior_rate, initial_infective, lambda, V, no_sims,
+Pseudo_Marginal_MCMC = function(N, Y, obs_times, beta0, gamma0, prior_rate, initial_infective, lambda, V, no_sims,
                                 no_its, burn_in, lag_max = NA, thinning_factor = 1, parallel = FALSE, no_cores){
 
   Start = as.numeric(Sys.time())
@@ -58,7 +60,10 @@ Pseudo_Marginal_MCMC = function(N, Y, k, T_obs, beta0, gamma0, prior_rate, initi
 
   #' Intialise Missing Data by Simulating no_sims epidemics with
   #' parameters beta and gamma
-  pi_Y_given_theta_hat_current = pi_Y_given_theta_hat(no_sims, N, Y, k, T_obs, initial_infective, theta[1], theta[2], parallel, no_cores)
+  pi_Y_given_theta_hat_current = 0
+  while(pi_Y_given_theta_hat_current == 0){
+    pi_Y_given_theta_hat_current = pi_Y_given_theta_hat(no_sims, N, Y, obs_times, initial_infective, theta[1], theta[2], parallel, no_cores)
+  }
 
   #' Create Storage Matrix
   draws = matrix(NA, nrow = no_its + 1, ncol = length(theta) + 1)
@@ -76,7 +81,7 @@ Pseudo_Marginal_MCMC = function(N, Y, k, T_obs, beta0, gamma0, prior_rate, initi
     log_theta = log(theta)
     log_theta_prop = log_theta + mvnfast::rmvn(1, mu = c(0,0), sigma = lambda*V)
     theta_prop = exp(log_theta_prop)
-    pi_Y_given_theta_hat_prop = as.numeric(pi_Y_given_theta_hat(no_sims, N, Y, k, T_obs, initial_infective, theta_prop[1], theta_prop[2], parallel, no_cores))
+    pi_Y_given_theta_hat_prop = as.numeric(pi_Y_given_theta_hat(no_sims, N, Y, obs_times, initial_infective, theta_prop[1], theta_prop[2], parallel, no_cores))
 
     log_u = log(runif(1))
 

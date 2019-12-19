@@ -26,7 +26,6 @@ next_infection = function(inf_period, contact_times, t_inf, which_infected, whic
   next_t_inf = min(future_t_inf)
   indices = which(future_t_inf == next_t_inf, arr.ind = TRUE)
 
-
   return(list(next_t_inf = next_t_inf, infector = which_infected[indices[1,1]], infected = which_susceptible[indices[1,2]]))
 
 }
@@ -51,11 +50,18 @@ new_states = function(state, next_t_inf, infector, infected, contact_times){
 
 Epidemic_Simulation <- function(N, a, par_gamma, par_beta, kernel){
 
-  state <- c(rep(1, a), rep(0, N - a)) # Which state is an individual in (S = 0, I = 1, R = 2)
+  #' Choose at random who is initially infected
+  #initialInfected <- sample(1:N, a, replace = F)
 
-  t_inf <- c(rep(0, a), rep(NA, N - a)) # Time at which an individual is infected.
+  state <- c(rep(1, a), rep(0, N - a))
+  t_inf <- c(rep(0 , a), rep(Inf, N - a))
+  #state = rep(0 , N)
+  #t_inf <- rep(0, N) # Time at which an individual is infected.
 
-  inf_period <- rgamma(N, rate = par_gamma[1], shape = par_gamma[2]) # Period of time for which an individual is infected
+  #state[initialInfected] <- 1
+  #t_inf [initialInfected] <- NA
+
+  inf_period <- rgamma(N, rate = par_gamma, shape = 1) # Period of time for which an individual is infected
 
   B = kernel(par_beta)
 
@@ -72,8 +78,8 @@ Epidemic_Simulation <- function(N, a, par_gamma, par_beta, kernel){
 
   # Check if
   if(min(contact_times[1,]) == Inf){
-    return(list(N = N, final_size = final_size, t_inf = c(rep(0, a), rep(Inf, N - 1)),
-                t_rem = c(inf_period[1:a], rep(Inf, N - 1))))
+    return(list(N = N, final_size = final_size, t_inf = c(rep(0, a), rep(Inf, N - a)),
+                t_rem = c(inf_period[1:a], rep(Inf, N - a))))
   }
 
   while(sum(state == 0) > 0 & sum(state == 1) > 0 & sum(state == 1) < N){
@@ -94,8 +100,8 @@ Epidemic_Simulation <- function(N, a, par_gamma, par_beta, kernel){
   }
 
   t_rem <- t_inf + inf_period
-  t_inf[-which(t_inf >= 0)] <- Inf
-  t_rem[-which(t_rem >= 0)] <- Inf
+  t_inf[!(t_inf >= 0) | is.na(t_inf)] <- Inf
+  t_rem[!(t_rem >= 0) | is.na(t_inf)] <- Inf
 
   return(list(N = N, final_size = final_size, t_inf = t_inf, t_rem = t_rem,
               par_beta = par_beta, par_gamma = par_gamma, kernel = kernel))
