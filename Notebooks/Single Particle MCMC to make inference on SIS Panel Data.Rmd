@@ -1,0 +1,316 @@
+---
+title: "Using fsMCMC/Single Particle MCMC to make inference on SIS Panel Data"
+output: html_notebook
+---
+
+```{r, include = F}
+devtools::load_all(".")
+```
+
+
+Using the fsMCMC method defined in a previous report, we investigate its effectiveness in making inference on the model parameters of an endemic process (SIS), using panel data. The challenge which arises with endemic processes, is their stationary behaviour. If the endemic level of the disease is large enough, the process will converge towards a state of steady prevalence of the disease. Due to the assumed stochasticity of the process, this will not be a constant prevalence and there will be cyclic behavior around the the deterministic steady state.
+
+From this, it may be more difficult to seperate $\beta$ and $\gamma$. In the deterministic case, it is simple to recieve an analytical form for steady state of the endemic. This is dependent on the ratio of $\beta$ and $\gamma$, which is directly proportional to the basic reproductive rate $R_0$. So, at a first glance, it may seem reasonably simple to receive $R_0$, which is useful but we would like to also make on $\beta$ and $\gamma$ individually.
+
+
+Due to the nature of this problem, it is natural approach to consider exploring just one of the parameters. This is to make sure that inference can be made on 1 parameter. It will be assumed that $\gamma$ is fixed (this is the most likely to be "known"). Hence we need to explore the state space of $\beta$ conditional on the panel data $Y$. 
+
+Once it has been confirmed that this is workable, then we begin investigation into the two parameter case, adding $\gamma$ back into the mix. 
+
+# Synthetic Dataset
+
+In order to assess the successfulness of inference, we require a dataset. This dataset will be relatively small compared to a realistic scenario, in order to keep runtime to a workable level.
+
+The endemic parameters are chosen so that the basic reproductive rate will be relitively low. Although this means that the disease is less likely to attain endemic status, we will assume that stationarity has already been reached, accounting for this in the initial state.
+
+```{r}
+
+#' Epidemic Initial Conditions
+N = 200
+gamma = 1
+R0 = 1.25
+beta = gamma*R0/N
+I_0 = 40
+initialState = c(rep(1, N - I_0), rep(2, I_0))
+
+```
+
+Number of panels collected will be kept moderate, to ensure that mixing is adequate. Mixing is not the main focus here, but it needs be adequate so we can distinguish convergence. The frequency of observations may be changed to investigate the effect on inference, but in the first instance, it is assumed that observations are made once every unit time (which lines up with the expected infectious period
+$1/\gamma$). 10\% of the population is observed. 
+
+```{r}
+#' Observation Parameters
+m = 0.1*N
+k = 5
+lastObs = 5
+
+```
+
+Simulation of the epidemic is carried out using a Gillespie algorithm, with panel data being recorded along the way. This gives panel data for the population, at the times specified.
+
+```{r}
+
+set.seed(1)
+obsTimes = seq(0, lastObs, length = k)
+SIS_sim = homogeneousPanelDataSIS_Gillespie(initialState, beta, gamma, obsTimes)
+
+
+```
+
+Next, a 10\% sample is taken from the population panel data and the transition data, required to calculate the likelihood estimate for fsMCMC, is extracted.
+
+```{r}
+#' Sample Panel Data
+panelData = panelDataSample(SIS_sim$panelData, m = m)
+Y = transitionData(panelData, states = 1:2)
+
+```
+
+Now, we are ready to begin investigating whether inference is successful with the current observation process.
+
+# fsMCMC
+
+A few things to note when using fsMCMC to investigate homogeneously mixing SIS processes. Unlike SIR processes, there is not an upper bound on the number of events which can occur. There is a stationary state when all individuals are susceptible, however (given that $R_0$ is sufficently large), new infecteds are easily created before this can occur. This creates a slight problem when constructing a realisation with a fixed vector of auxilary variables. In theory, we have an indefinite stream and exponential and uniform random varibles. In reality, this is difficult to implement for a number of reasons. 
+
+One solution is to draw a large amount of auxilary variables, far more than will be needed. This creates a problem in the proposal step, as a large amount of the variables which are renewed will not influence the change in the constructed realisation. 
+
+Another solution is to concatenate to auxilary variables to the list as they need to be drawn (this is valid?). This could add a lot of computational effort.
+
+Could we choose to renew only the aux. variables which were used in the previous realisation? (Something tells me that this is not valid, as changing these variables will most likely introduce later aux. variables which also should be able to change)
+
+This problem may not arise if $\beta$ and $\gamma$ converge to correct distribution, however, if they cannot be identified, they can increase, increasing the expected number of events in the observation period.
+
+## fsMCMC: Gamma Fixed
+
+```{r}
+noIts = 10000
+burnIn = 0
+noDraws = 2000
+s = 150
+lambda = 0.00008
+runBeta = SIS_fsMCMC_beta(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma, thetaLim = 2*beta, lambda,
+                          noDraws, s, noIts, burnIn)
+
+```
+
+## fsMCMC: Gamma Unknown
+
+This time round we must also explore the state space for $\gamma$ as well as $\beta$. Using a folded-normal RWM again, we also use a covariance matrix which accounts for the smaller scaling in the $\beta$ direction.
+
+```{r}
+
+noIts = 10000
+noDraws = 2000
+lambda = 0.00005
+V = diag(c(1/N, 1))
+s = 200
+thetaLim = 2*c(beta, gamma)
+runFull = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda, V,
+                  noDraws, s, noIts)
+
+```
+
+Doesn't look like $\beta$ and $\gamma$ are converging to the true values. Looking at the samples of the reproductive rate however, mixing and convergence looks a lot better. 
+
+### Adaptive Tuning
+
+It is not possible to achieve great mixing unless we consider the best choice for the proposal variance-covariance matrix, especially with increasing number of panels where sensible proposals become more important. For a Pseudo MArginal type MCMC, 7% acceptance is optimal
+
+\begin{enumerate}
+\item Tune RWM proposal parameter
+\item Variance-Covariance Matrix
+\end{enumerate}
+
+Do multiple "small" runs (10000 iterations say). In the first run, attempt to tune the global jump size ($\lambda$). F ofor a random walk jump proposal, we would like to accept round 25\% of proposals. At each proposal step penalise the jump size, however penalise the jump size parameter 3 times as much if the proposal is accepted. From this run, calcluate the variance-covariance matrix between $\beta$ and $\gamma$ and use this in the proposal distribution for the next run, with global jump size equal to the optimal $2.38/2$.
+
+
+\begin{itemize}
+\item Tune Proposal parameter then use variance-covariance matrix with end proposal parameter
+\item Tune Proposal parameter then use variance-covariance matrix with proposal parameter equal to 1
+\item Tune proposal parameter then use varaince-covariance matrix with proposal parameter equal to 2.4/2
+\end{itemize}
+
+Optimize Global proposal parameter
+
+23\% is around optimal for RWM with infinite parameters. However, in the case where estimation of the likelihood as taken place, the target distribution is noisier than is the likelihood could be calculated. Hence, the optimal acceptance rate will always be lower than a standard RWM. Closer to 10\% seems to work quite well.
+
+```{r}
+noIts = 10000
+lambda = 5*10^(-5)
+V = diag(c(1/N, 1))
+noDraws = 2000
+s = 150
+thetaLim = 4*c(beta, gamma)
+
+adaptiveRun7 = adaptiveSISfsMCMC7(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda0 = lambda,
+                                  noDraws = noDraws,s = s, noIts = 10000, delta = 0.05)
+
+finalRun7 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = adaptiveRun7$lambda, 
+                       V = var(adaptiveRun7$draws[, 1:2]), noDraws, s, noIts = 10000)
+
+
+
+# for(i in 1:10){
+# adaptiveRun = adaptiveSISfsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = adaptiveRun$lambda, 
+#                                 V = var(adaptiveRun$draws[, 1:2]), firstRun = FALSE, noDraws, s, noIts = 10000, delta = 0.05)
+# }
+# AR = adaptiveRun$acceptRate[1]
+# lambda = adaptiveRun$lambda
+# print("==== FIRST RUNS ====")
+# #while(AR > 0.30 | AR < 0.20){
+# for(i in 1:10){
+# adaptiveRun = adaptiveSISfsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = tail(adaptiveRun$draws[,1], n = 1), gamma0 = tail(adaptiveRun$draws[,2], n = 1), thetaLim, lambda = adaptiveRun$lambda, 
+#                                 V = var(adaptiveRun$draws[-(1:1000),1:2]), noDraws, s, noIts = 10000)
+#   
+# }
+par(mfrow = c(1, 2))
+data = finalRun7$draws[, 1:2]
+plot(N*data[,1]/data[,2], type = 'l')
+acf(N*data[,1]/data[,2])
+
+
+```
+
+Posterior variance of both $\beta$ and $\gamma$ are quite high here, which is understandable as there is not many panels.
+
+The original epidemic is assumed to be in stationarity, however. Would more information be gained by observing an epidemic which does not start in stationarity. Simulate an epidemic which starts with less people infected, but still reaches stationarity
+
+```{r}
+set.seed(5)
+I_0 = 5
+initialState = c(rep(1, N - I_0), rep(2, I_0))
+
+SIS_nonStat_sim = homogeneousPanelDataSIS_Gillespie(initialState, beta, gamma, obsTimes)
+fullPanelDataNonStat = panelDataSample(SIS_nonStat_sim$panelData, m = N)
+XNonStat =  transitionData(fullPanelDataNonStat, states = 1:2)
+panelDataNonStat = panelDataSample(SIS_nonStat_sim$panelData, m = m)
+
+YNonStat = transitionData(panelDataNonStat, states = 1:2)
+
+adaptiveRun7NonStat = adaptiveSISfsMCMC7(YNonStat, I_0, SIS_nonStat_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda0 = lambda,
+                                  noDraws = noDraws,s = s, noIts = 10000, delta = 0.05)
+
+finalRun7NonStat = SIS_fsMCMC(YNonStat, I_0, SIS_nonStat_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = adaptiveRun7NonStat$lambda, V =    var(adaptiveRun7NonStat$draws[, 1:2]), 
+                  noDraws, s, noIts = 10000)
+
+
+```
+
+
+
+```{r}
+print("==== NEXT RUN ====")
+  nextRuns1 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = adaptiveRun$lambda, V = var(adaptiveRun$draws[, 1:2]), 
+                  noDraws, s, noIts = 10000)
+for(i in 1:2){
+  print("==== NEXT RUN ====")
+  nextRuns1 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = adaptiveRun$lambda, V = var(nextRuns1$draws[, 1:2]), 
+                  noDraws, s, noIts = 10000)
+}
+
+```
+
+
+
+```{r}
+
+print("==== NEXT RUN ====")
+  nextRuns2 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = 1, V = var(adaptiveRun$draws[, 1:2]), 
+                  noDraws, s, noIts = 10000)
+for(i in 1:2){
+  print("==== NEXT RUN ====")
+  nextRuns2 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = 1, V = var(nextRuns2$draws[, 1:2]), 
+                  noDraws, s, noIts = 10000)
+}
+```
+
+```{r}
+
+print("==== NEXT RUN ====")
+  nextRuns3 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = 2.8/2, V = var(adaptiveRun$draws[, 1:2]), 
+                  noDraws, s, noIts = 10000)
+# for(i in 1:2){
+#   print("==== NEXT RUN ====")
+#   nextRuns3 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda = adaptiveRun$lambda, V = var(nextRuns3$draws[, 1:2]), 
+#                   noDraws, s, noIts = 10000)
+# }
+  
+  plot(mtcars$mpg, mtcars$cyl)
+```
+
+
+```{r}
+par(mfrow = c(1, 2))
+mean(N*runFull$draws[, 1]/runFull$draws[,2])
+plot(N*runFull$draws[, 1]/runFull$draws[,2], type = 'l') #' Check Convergence/Mixing
+acf(N*runFull$draws[, 1]/runFull$draws[,2]) #' Check dependency that carries through the chain
+
+```
+
+## Investigating different observation frequencies
+
+Increase the observation window to decrease the observation frequency.
+```{r}
+
+set.seed(1)
+obsTimes2 = seq(0, lastObs + 5, length = k)
+SIS_sim2 = homogeneousPanelDataSIS_Gillespie(initialState, beta, gamma, obsTimes)
+
+#' Sample Panel Data
+panelData2 = panelDataSample(SIS_sim$panelData, m = m)
+Y2 = transitionData(panelData, states = 1:2)
+
+```
+
+
+```{r}
+
+noIts = 10000
+noDraws = 2000
+lambda = 0.00005
+V = diag(c(1/N, 1))
+s = 200
+thetaLim = 2*c(beta, gamma)
+runFull2 = SIS_fsMCMC(Y2, I_0, SIS_sim2$obsTimes, N, beta0 = beta, gamma0 = gamma, thetaLim, lambda, V, 
+                  noDraws, s, noIts)
+```
+
+```{r}
+par(mfrow = c(1, 2))
+mean(N*runFull2$draws[, 1]/runFull2$draws[,2])
+plot(N*runFull2$draws[, 1]/runFull2$draws[,2], type = 'l') #' Check Convergence/Mixing
+acf(N*runFull2$draws[, 1]/runFull2$draws[,2]) #' Check dependency that carries through the chain
+```
+
+
+```{r}
+
+noIts = 10000
+noDraws = 2000
+lambda = 0.00005/2
+V = matrix(c(1/N, 0.5/sqrt(N), 0.5/sqrt(N), 5), byrow = T, nrow = 2, ncol = 2)
+s = 200
+thetaLim = 2*c(beta, gamma)
+runFull3 = SIS_fsMCMC(Y, I_0, SIS_sim$obsTimes, N, beta0 = 0.01, gamma0 = 0.8, thetaLim, lambda, V, 
+                  noDraws, s, noIts)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

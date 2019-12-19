@@ -39,7 +39,7 @@
 
 # ==== Non-Centered Algorithm ====
 
-NonCentered_MCMC <- function(N, t_rem, gamma0, theta_gamma, beta0, theta_beta, kernel, no_its,
+NonCentered_MCMC <- function(N, a, t_rem, gamma0, theta_gamma, beta0, theta_beta, kernel, no_its,
                              burn_in = 0, no_proposals, lambda,
                              PLOT = TRUE, thinning_factor = 1, lag_max = NA){
 
@@ -60,7 +60,7 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, theta_gamma, beta0, theta_beta, k
 
   # Initialise Beta and Gamma Values
   beta <- beta0
-  B = kernel(beta0)
+  #B = kernel(beta0)
   gamma <- gamma0
 
   inf_period <- rep(0, N)
@@ -117,7 +117,7 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, theta_gamma, beta0, theta_beta, k
     pb$tick()
 
     # == Beta ==
-    beta  <-  rgamma(1, shape = (n_I - 1) + theta_beta[1], rate = theta_beta[2] + IP_integral)
+    beta  <-  rgamma(1, shape = n_I + theta_beta[1], rate = theta_beta[2] + IP_integral)
 
     # Log-Likelihood
     loglikelihood = epidemic_loglikelihood(beta, gamma, t_inf, t_rem, kernel)
@@ -163,7 +163,7 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, theta_gamma, beta0, theta_beta, k
     # Draw the new Us using Exp(1)
 
     U_prop <- U
-    U_prop[proposed_infected] <- rgamma(no_proposals, rate = 1, shape = alpha)
+    U_prop[proposed_infected] <- rexp(no_proposals, rate = 1)
 
     # Sync t_inf_prop and U_prop
     t_inf_prop <- t_rem - (1/gamma)*U_prop
@@ -173,8 +173,10 @@ NonCentered_MCMC <- function(N, t_rem, gamma0, theta_gamma, beta0, theta_beta, k
 
     # = Accept/Reject =
 
-    log_a <- (loglikelihood_prop + sum(dgamma(U[proposed_infected], rate = gamma, shape = alpha, log = TRUE))) -
-      (loglikelihood + sum(dexp(U_prop[proposed_infected], rate = gamma, log = TRUE)))
+    log_a <- (loglikelihood_prop + sum(dexp(U[proposed_infected], rate = 1, log = TRUE)) +
+                sum(dexp(U_prop[proposed_infected], rate = 1, log = T))) -
+      (loglikelihood + sum(dexp(U_prop[proposed_infected], rate = 1, log = TRUE)) +
+         sum(dexp(U[proposed_infected], rate = 1, log = T)))
 
     log_u <- log(runif(1))
 

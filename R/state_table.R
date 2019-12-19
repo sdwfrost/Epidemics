@@ -17,4 +17,3 @@ state_table = function(x, y, trans){
   #return(table(factor(x, levels, states), factor(y, levels, states)))
   freq = sapply(X = trans, function(X) sum(X[1] == x & X[2] == y))
 }
-

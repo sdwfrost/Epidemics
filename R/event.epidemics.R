@@ -15,9 +15,11 @@
 
 
 event.epidemics = function(individual_inf_rate, gamma, Y, U = NULL){
-#  if(is.null(U) | is.logical(is.na(U))){
-#    U = runif(1, 0, 1)
-#  }
+
+  if(is.null(U) | is.logical(is.na(U))){
+    U = runif(1, 0, 1)
+  }
+
   X = length(individual_inf_rate)
   rates = c(individual_inf_rate, rep(gamma,Y))
   total_rate = sum(rates)

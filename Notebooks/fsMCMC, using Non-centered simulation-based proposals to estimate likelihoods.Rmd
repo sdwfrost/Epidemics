@@ -1,0 +1,112 @@
+---
+title: "fsMCMC, using Non-centered simulation-based proposals for intractable likelihoods"
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Observing the evolution of an infectious disease may be limited by many factors. In some cases, it may only be feasible to observe a subset of the population at discrete time points. This makes inference difficult, as it is not possible to build a tractable likelihood as we only have partial observation of the epidemic. 
+
+Classic MCMC methods assumed that calculation of the posterior (upto a constant of proportionality) is possible, including the ones used previously in this series. This requires calculation of the likelihood, which is not possible in the epidemic panel data case.
+
+# Psuedo-Marginal MCMC
+
+Assume some stochastic Process $V$ from which only a partial/noisy observation $y$ can be obtained. The observation of $y$ is dependent on the some observational parameters $\theta_2$ and the stochastic process $V$. Hence, the observational density,
+
+$$ \pi(y | \theta_2, V) $$
+
+The stochastic process its self is assumed to be distributed acorrding to the process parameters $\theta_1$, with likelihood
+
+$$ \pi(V | \theta_1) $$
+
+The parameters $(\theta_1, \theta_2)$ are of interest, of which we must make inference based on the noisy observation $y$. Using a Bayesian Framework, a posterior distribution for the parameters is as follows,
+
+$$ \pi(\theta | y) \propto \pi(y | \theta)\pi(\theta)  $$
+How do we construct the likelihood? Is it even able to be calculated? Using the assumption on the generations of $y$ and $V$,
+
+\begin{align*}
+\pi(y | \theta) &= \int \pi(y, V | \theta) dV \\
+                &= \int \pi(y | \theta_2, V)\pi(V| \theta_1) dV \\
+\end{align*}
+
+In many scenarios, it is not possible to calculate this integral, and so a tractable form of the likelihood is impossible. As a consequence, the posterior cannot be calculated exactly. This creates a problem if we would like to explore the $\theta$ parameter space through an MCMC framework.
+
+Despite this, it is still possible to create a valid MCMC proposal with exact calculation of the posterior. Suppose we can construct some unbiased estimator for the likelihood $\widehat{\pi(y|\theta)}$, which inturn gives us a unbiased estimator of the posterior,
+
+\begin{equation}
+ \mathbb{E}[\widehat{\pi(y|\theta)}\pi(\theta)] = \pi(\theta|y)
+\end{equation}
+
+This is done by introducing an auxiliary variable $U$ which serves as bridge between the stochastic process and the observation process. $U$ together with the process parameter(s) $\theta_1$ determine $V$. Then, an estimate can be constructed using $U$.
+
+$$ \hat{p}(y | \theta, U) $$
+If this is unbiased, then an unbiased estimator for the posterior is reached,
+
+$$ \hat{\pi}(\theta | U, y) = \pi(\theta)\hat{p}(y | \theta, U)$$
+
+Thankfully, it is still possible to construct an MCMC scheme which converges to the correct stationary distribution, while using an unbiased estimator of the posterior in place of the posterior. This is the basis of a Psuedo-Marginal MCMC scheme. The efficiency and quality of inference will depend on the accuracy of this estimator.
+
+## Algorithm
+
+\begin{itemize}
+\item store $\theta$, $\hat{\pi}(\theta| U, y)$
+\item Propose $\theta'$ from proposal $q(\theta'| \theta)$
+\item Propose $u'$ from proposal $q(u' | \theta')$
+\item Construct $\hat{\pi}(\theta'|u', y)$
+\end{itemize}
+
+Accept proposal $ \theta'$, $\hat{\pi}(\theta'| u', y)$ with probability
+
+$$ \alpha(\theta, u \to \theta', u') = min(1, \frac{\hat{\pi}(\theta'| u', y)q(\theta|\theta')}{\hat{\pi}(\theta| u, y)q(\theta'|\theta)}) $$
+
+## Target Distribution
+
+We would like some reassurance that the PM-MCMC targets the distribution of interest.
+In the extended setting, we would like to target
+
+$$ \tilde{\pi}(\theta, u| y) := \hat{\pi}(\theta|u, y)q(u | \theta) $$
+
+as the marginal (over $u$) for this density is simply the posterior for $\theta$. This can be shown by using the fact that \hat{p}(y | \theta, U) is unbiased. Thankfully, the proposal scheme outlined above preserves detailed balance with respect to \tilde{\pi}(\theta, u| y), and so the chain will converge to this distribution.
+
+## Efficiency of PM-MCMC
+
+Andrieu and Vihola (2015) showed that the acceptance rate of a PM-MCMC with a MH proposal is never greater than that of an MCMC with a vanilla MH proposal. Futhermore, comparing two PM-MCMC, the one with the noisier estimate for the likelihood is always less efficient. Using an average of two or more unbiased estimators is more effient than one which uses only one estimator.
+
+
+# fsMCMC: Non-centering Simulation for MCMC proposals
+
+How do we get this estimate for the likelihood in our case?
+
+## Gillespie Simulation
+
+An epidemic may be simulated easily, using a Gillespie style simulation. At each timestep, an exponential and uniform random variable are drawn. The exponential variable is used to determine when the next event will occur, scaled by the total rate of any event occuring at that time. The random uniform varible will determine the nature of the event, whether an infection/removal occured and possibly who this event occured to. This is determined based on the state an individuals is in and possibly how many people are in other states.
+
+From this simulation, it is possible to extract simulated panel data for the population. This will include simulated data on the infectious state of the individuals which were actually observed. A likelihood estimate can then be constructed based on how well the simulation $X$ matches up with the observed data $y$
+
+## Homogneously Mixing Epidemics
+
+In a homogeneously mixing setting, we assume that the labels of individuals are exchangeable which in turn allows us to say that the transitions of sampled individuals between two time points are hypergeometrically distributed according to the transition data of the population. If $X$ is the panel data for the population, then $\pi(y| X, \theta)$ is a hypergeometic distribution and in unbiased estimator of $\pi(y|\theta)$. 
+
+## Niave MCMC
+
+A niave Psuedo-Marginal approach would be to simulate a realisation $X$, using current process parameters $\theta$, estimating the current likelihood through $\pi(y | X,  \theta)$. Then propose $\theta'$, simulate once again based on the proposal and calculate a new estimate for the likelihood. Acceptance is then based on these values.
+
+
+
+
+
+
+
+
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

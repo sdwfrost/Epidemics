@@ -101,17 +101,18 @@ transition_table.epidemics = function(subject, times, state, prev_state, period,
     end_state = state_prev_events
   }
 
-  trans = state_table(start_state, end_state, state_names, levels)
+   trans = state_table(start_state, end_state, possible_transitions(1:3))
   #trans = table(start_state, end_state)
 
-  names(dimnames(trans)) = c("t_0", "t_1")
+  #names(dimnames(trans)) = c("t_0", "t_1")
 
   if(output == "table"){
     return(trans)
   } else if(output == "freq"){
-    trans = as.data.frame(trans)
+    #trans = as.data.frame(trans)
     #trans_names =  sapply(X = 1:nrow(trans), function(X) paste(trans[X,1:2], sep = "", collapse = ""))
-    return(trans$Freq)
+    #return(trans$Freq)
+    return(trans)
   }
 }
 

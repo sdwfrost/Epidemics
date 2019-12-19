@@ -1,0 +1,26 @@
+---
+title: "Particle Filtering for Epidemic Modelling"
+output: html_notebook
+---
+
+Observing the evolution of an infectious disease may be limited by many factors. In some cases, it may only be feasible to observe a subset of the population at discrete time points. This makes inference difficult, as it is not possible to build a tractable likelihood. 
+
+MCMC methods used previously in this series have required evaluations of the posterior (up to a constant of proportionality), which requires calculation of the likelihood. 
+
+A method has been set out to make inference on Epidemic Panel Data through MCMC with a simulation-based proposal. This simulation is used, along with a hypergeometic sampling assumption (which is made based on exchangability of individuals) to give a point estimate of the likelihood.
+
+
+```{r, include=FALSE}
+
+#' Load Epidemics Package
+devtools::load_all(".")
+
+```
+
+
+
+```{r, include=TRUE}
+
+
+
+```

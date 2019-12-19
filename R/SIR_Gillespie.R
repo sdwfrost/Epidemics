@@ -1,21 +1,36 @@
 #' SIR_Gillespie function
 #'
 #' Takes parameters for an SIR Infectious Process and returns either an event table or
-#' panel data.
+#' panel data
 
-SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
+#' Initial State, a vector of length N stating who is which infectious state and
+#' the current time.
+
+SIR_Gillespie = function(N, initial_state = "start", beta, gamma, trans = possible_transitions(1:3),
                          obs_end = Inf, kernel = NULL,
                          U, E, output = "event", obs_times = NULL){
 
-  current_time = 0
-  X = N - a
-  Y = a
-  Z = N - X - Y
-
   #' Track specific people
-  S = 1:(N - a) #' Set of Susceptibles
-  I = (N - a + 1):N #' Set of Infectives
-  R = NULL #' Set of removed
+  if(length(initial_state) == 1){
+    current_time = 0
+    X = N - 1
+    Y = 1
+    Z = N - X - Y
+
+    S = 1:(N - 1) #' Set of Susceptibles
+    I = (N - 1 + 1):N #' Set of Infectives
+    R = NULL #' Set of removed
+  } else{
+    current_time = obs_times[1]
+    X = sum(initial_state == 1)
+    Y = sum(initial_state == 2)
+    Z = sum(initial_state == 3)
+
+    S = which(initial_state == 1) #' Set of Susceptibles
+    I = which(initial_state == 2) #' Set of Infectives
+    R = which(initial_state == 3) #' Set of removed
+  }
+
 
   current_state = state(S, I, R)
   #' Infection Matrix
@@ -27,14 +42,15 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
     event_table = NULL
     panel_data = lapply(rep(NA, length(obs_times)), function(X) return(X))
   } else{
-    panel_data = NULL
-    event_table = data.frame(matrix(NA, nrow = 2*N + 1, ncol = 4))
 
-    event_table[1:(N-a), ] = matrix(c(1:(N-a), rep(0, N - a), rep(1, N - a), rep(1, N - a)),
-                                    nrow = N - a, ncol = 4, byrow = FALSE)
-    event_table[(N - a + 1):N, ] = matrix(c((N - a + 1):N, rep(0, a), rep(2, a), rep(2, a)),
-                                          nrow = a, ncol = 4, byrow = FALSE)
-    colnames(event_table) = c("ID", "times", "state", "prev_state")
+    panel_data = NULL
+
+    #event_table = data.frame(matrix(NA, nrow = N + 2*X + Y, ncol = 4))
+    event_table = matrix(NA, nrow = N + 2*N - Y - 2*Z, ncol = 4)
+
+    event_table[1:N, ] = matrix(c(1:N, rep(0, N), current_state, current_state),
+                                    nrow = N, ncol = 4, byrow = FALSE)
+    #colnames(event_table) = c("ID", "times", "state", "prev_state")
   }
 
   no_event = 1
@@ -70,18 +86,13 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
       obs_times_passed = which(old_time <= obs_times & obs_times <= current_time)
 
       if(length(obs_times_passed) > 0){
-
-        prev_state = current_state
         current_state = state(S, I, R)
+        panel_data[[obs_times_passed[1]]] = current_state
 
-        transitions = state_table(prev_state, current_state, trans)
-
-        panel_data[[obs_times_passed[1]]] = transitions
         if(length(obs_times_passed) > 1){
-          no_events_transitions = state_table(current_state, current_state, trans)
-        }
-        for(i in obs_times_passed[-1]){
-          panel_data[[i]] = no_events_transitions
+          for(i in obs_times_passed[-1]){
+            panel_data[[i]] = current_state
+          }
         }
       }
     }
@@ -111,9 +122,7 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
       prev_state = 1
       state = 2
     }
-    if(is.na(individual)){
-      print(no_event)
-    }
+
     if(output != "panel"){
       event_table[N + no_event, ] = c(individual, current_time, state, prev_state)
     }
@@ -123,24 +132,22 @@ SIR_Gillespie = function(N, a, beta, gamma, trans = possible_transitions(1:3),
   if(output == "panel" & sum(is.na(panel_data)) > 0){
     NA_panels = which(is.na(panel_data))
     if(current_time < obs_times[NA_panels[1]]){
-      old_state = current_state
+      #old_state = current_state
       current_state = state(S, I, R)
-      panel_data[[NA_panels[1]]] = state_table(old_state, current_state, trans)
-      no_events_transitions = state_table(current_state, current_state, trans)
+      panel_data[[NA_panels[1]]] = current_state
+      # no_events_transitions = state_table(current_state, current_state, trans)
       for(i in NA_panels[-1]){
-        panel_data[[i]] = no_events_transitions
+        panel_data[[i]] = current_state
       }
     } else{
-      no_events_transitions = state_table(current_state, current_state, trans)
+      # no_events_transitions = state_table(current_state, current_state, trans)
+      current_state = state(S, I, R)
       for(i in NA_panels){
-        panel_data[[i]] = no_events_transitions
+        panel_data[[i]] = current_state
       }
     }
-
   }
-
   event_table = na.omit(event_table)
   return(list(event_table = event_table, X = X, Y = Y, Z = Z, kernel = kernel,
               panel_data = panel_data))
 }
-
