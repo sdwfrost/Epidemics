@@ -333,6 +333,7 @@ heterogeneousSIR_Gillespie = function(initialState, beta, gamma, kernel){
 
 homogeneousPanelDataSIR_Gillespie = function(initialState, beta, gamma, obsTimes){
 
+  N = length(initialState)
   currentTime = 0
   #' Possible states and their respective
   #' logical representations.

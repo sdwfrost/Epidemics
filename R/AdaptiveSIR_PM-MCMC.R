@@ -1,5 +1,9 @@
-#' Adapts proposal parameters for a Pseudo-Marginal MCMC
 
+#' Adaptive Pseudo-Marginal MCMC for SIR Epidemic Panel Data
+#'
+#' Adapts proposal parameters for with a view of optimal of a target using Pseudo-Marginal MCMC scheme.
+
+#' @family Panel Data MCMC
 #' @param obsTransData Interpanel transition data.
 #' @param I_0 Initial number of infectives in the population.
 #' @param obsTimes Times at which epidemic cohort were followed up.
@@ -15,6 +19,8 @@
 #' @param thinningFactor Controls the factor by which MCMC samples are thinned, to reduce dependency.
 #' @param parallel Are epidemic simulations run in parallel?
 #' @param noCores If epidemic simulations are run in parallel, this is the number of cores utilised.
+#'
+#' @return Proposal parameters which can be used for more optimal exploration of target distribution (plus MCMC summary).
 
 
 adaptiveSIR_PseudoMarginalMCMC = function(obsTransData, I_0, obsTimes, N, beta0, gamma0,
@@ -36,11 +42,11 @@ adaptiveSIR_PseudoMarginalMCMC = function(obsTransData, I_0, obsTimes, N, beta0,
     logPCurr = mean(sapply(X = transDataSim, function(X) dHyperGeom(obsTransData, X, noSampled, log = T)))
   }
 
-  #' Create Storage Matrix
+  # Create Storage Matrix
   draws = matrix(NA, nrow = noIts + 1, ncol = length(thetaCurr) + 1)
   draws[1,] = c(thetaCurr, logPCurr)
 
-  #' Proposal Acceptance Counter
+  # Proposal Acceptance Counter
   accept = 0
 
   print("Sampling Progress")
@@ -48,7 +54,7 @@ adaptiveSIR_PseudoMarginalMCMC = function(obsTransData, I_0, obsTimes, N, beta0,
 
   for(i in 1:noIts){
     pb$tick()
-    #' Propose new beta and gamma using Multiplicative RW propsal
+    # Propose new beta and gamma using Multiplicative RW propsal
     u1 = runif(1, 0, 1)
     if(u1 > delta & accept > 10){
       Vi = var(draws[,1:2], na.rm = T)
@@ -56,10 +62,6 @@ adaptiveSIR_PseudoMarginalMCMC = function(obsTransData, I_0, obsTimes, N, beta0,
     } else{
       thetaProp = abs(thetaCurr + lambda0*mvtnorm::rmvnorm(1, mean = rep(0, 2), sigma = V0))
     }
-
-    #print(sim$noDraws)
-    #print(thetaCurr)
-    #print(accept)
 
     panelDataSim = replicate(noSims, homogeneousPanelDataSIR_Gillespie(initialState = c(rep(1, N - I_0), rep(2, I_0)), thetaProp[1],
                                                                        thetaProp[2], obsTimes)$panelData, simplify = FALSE)
@@ -83,10 +85,10 @@ adaptiveSIR_PseudoMarginalMCMC = function(obsTransData, I_0, obsTimes, N, beta0,
         lambda = lambda - 0.07*(lambda/sqrt((i)))
       }
     }
-    #' Store State
+
+    # Store State
     draws[i + 1, ] = c(thetaCurr, logPCurr)
-    # print(c(thetaCurr))
-    # print(lambda)
+
   }
 
   End <- as.numeric(Sys.time())
@@ -123,7 +125,6 @@ adaptiveSIR_PseudoMarginalMCMC = function(obsTransData, I_0, obsTimes, N, beta0,
     acf(draws[, 2], lag_max)
   }
 
-  #' Calculating Summary Statistics for samples
   betaSummary = c(mean(draws[,1]), sd(draws[,1]))
   gammaSummary = c(mean(draws[,2]), sd(draws[,2]))
   if(accept < 10){

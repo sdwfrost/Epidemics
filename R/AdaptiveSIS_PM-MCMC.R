@@ -1,5 +1,27 @@
-#' Adaptive SIS PM-MCMC
+
+#' Adaptive Pseudo-Marginal MCMC for SIS Epidemic Panel Data
 #'
+#' Adapts proposal parameters for with a view of optimal of a target using Pseudo-Marginal MCMC scheme.
+
+#' @family Panel Data MCMC
+#' @param obsTransData Interpanel transition data.
+#' @param I_0 Initial number of infectives in the population.
+#' @param obsTimes Times at which epidemic cohort were followed up.
+#' @param N Population size.
+#' @param beta0 Starting value for infectious process parameter.
+#' @param gamma0 Starting value for removal/recovery process parameter.
+#' @param lambda0 Starting value for RWM proposal parameter which is to be adapted.
+#' @param V0 Starting state for RWM proposal Covariance matrix which is to be adapted.
+#' @param delta Probability that a proposal is made based on the starting proposal conditions.
+#' @param noSims Number of epidemic simulations to be used per iteration for estimation of likelihood.
+#' @param noIts Number of MCMC iterations.
+#' @param lagMax Plotting parameter for acf() function.
+#' @param thinningFactor Controls the factor by which MCMC samples are thinned, to reduce dependency.
+#' @param parallel Are epidemic simulations run in parallel?
+#' @param noCores If epidemic simulations are run in parallel, this is the number of cores utilised.
+#'
+#' @return Proposal parameters which can be used for more optimal exploration of target distribution (plus MCMC summary).
+
 
 adaptiveSIS_PseudoMarginalMCMC = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, lambda0 = 2.38/sqrt(2), V0 = diag(c(1/N, 1)), noSims,
                                       noIts, burnIn, lagMax = NA, thinningFactor = 1, parallel = FALSE, noCores,

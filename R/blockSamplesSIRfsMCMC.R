@@ -1,11 +1,30 @@
-#' SIR_fsMCMC *NEW*
-# ==== SIR fsMCMC Blocked Independence Sampler ====
 
-SIR_fsMCMC_blockedIS = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, thetaLim, lambda, V, noDraws = 2*N - I_0, blockSize, noIts,
+#' fsMCMC MCMC for SIR Epidemic Panel Data (with blocked proposals of underlying Random Variables)
+#'
+#' Adapts proposal parameters for with a view of optimal of a target using forward simulation MCMC scheme.
+
+#' @family Panel Data MCMC
+#' @param obsTransData Interpanel transition data.
+#' @param I_0 Initial number of infectives in the population.
+#' @param obsTimes Times at which epidemic cohort were followed up.
+#' @param N Population size.
+#' @param beta0 Starting value for infectious process parameter.
+#' @param gamma0 Starting value for removal/recovery process parameter.
+#' @param lambda Starting value for RWM proposal parameter which is to be adapted.
+#' @param V Starting state for RWM proposal Covariance matrix which is to be adapted.
+#' @param noDraws Number of underlying variables to be drawn (i.e max. number of events in observation period)
+#' @param blockSize Number of underlying random variables of the process to refresh.
+#' @param noIts Number of MCMC iterations.
+#' @param lagMax Plotting parameter for acf() function.
+#' @param thinningFactor Controls the factor by which MCMC samples are thinned, to reduce dependency.
+#'
+#' @return MCMC summary.
+
+SIR_fsMCMC_blockedIS = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, lambda, V, noDraws = 2*N - I_0, blockSize, noIts,
                                 burnIn = 0, lagMax = NA, thinningFactor = 1){
 
-  #' Calculate the amount of blockSamples which need to be made
-  #' To accomodate for a potentially different final block size (blockSamples is not integer), calculate the residual noDraws
+  # Calculate the amount of blockSamples which need to be made
+  # To accomodate for a potentially different final block size (blockSamples is not integer), calculate the residual noDraws
   blockSamples = ceiling(noDraws/blockSize)
   indicies = lapply(X = 0:(blockSamples - 1), function(X){c(X*blockSize + 1, min((X+1)*blockSize, noDraws))})
 
@@ -28,11 +47,11 @@ SIR_fsMCMC_blockedIS = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, t
 
   }
 
-  #' Create Storage Matrix
+  # Create Storage Matrix
   draws = matrix(NA, nrow = noIts + 1, ncol = length(thetaCurr) + 1)
   draws[1,] = c(thetaCurr, logPCurr)
 
-  #' Proposal Acceptance Counter
+  # Proposal Acceptance Counter
   acceptTheta = 0
   acceptEU = 0
   print("Sampling Progress")
@@ -42,7 +61,7 @@ SIR_fsMCMC_blockedIS = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, t
     pb$tick()
     # ==== Beta and Gamma Proposal ====
 
-    #' Folded Normal
+    # Folded Normal
     thetaProp = abs(thetaCurr + mvtnorm::rmvnorm(1, mean = rep(0, 2), sigma = lambda*V))
 
 
@@ -51,13 +70,8 @@ SIR_fsMCMC_blockedIS = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, t
     transDataSim = transitionData(newSim$panelData, states = 1:3)
     logPProp = dHyperGeom(obsTransData, transDataSim, noSampled, log = T)
 
-    # + sum(thetaCurr)
-    if(sum(thetaProp < thetaLim) == 2){
-      logA = (logPProp + sum(dexp(thetaProp, rate = 0.001, log = T)) ) -
-        (logPCurr + sum(dexp(thetaCurr, rate = 0.001, log = T)) )
-    } else{
-      logA = -Inf
-    }
+    logA = (logPProp + sum(dexp(thetaProp, rate = 0.001, log = T)) ) -
+      (logPCurr + sum(dexp(thetaCurr, rate = 0.001, log = T)) )
 
     logU = log(runif(1))
 
@@ -91,7 +105,7 @@ SIR_fsMCMC_blockedIS = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, t
       acceptEU = acceptEU + 1
     }
 
-    #' Store State
+    # Store State
     draws[i+1, ] = c(thetaCurr, logPCurr)
   }
 
@@ -127,7 +141,7 @@ SIR_fsMCMC_blockedIS = function(obsTransData, I_0, obsTimes, N, beta0, gamma0, t
     acf(draws[, 2], lagMax, main = "")
   }
 
-  #' Calculating Summary Statistics for samples
+  # Calculating Summary Statistics for samples
   betaSummary = c(mean(draws[,1]), sd(draws[,1]))
   gammaSummary = c(mean(draws[,2]), sd(draws[,2]))
 

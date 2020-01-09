@@ -21,7 +21,7 @@ SIR_PM_MCMCexperiment1 = function(noPanels, noSims, lambda0, V0, adapt = T, noIt
     print(paste(c("==== Adaptive Step (", noPanels, "Panels,", noSims, "Sims )",   "===="), collapse = " "))
 
     adaptRun = adaptiveSIR_PseudoMarginalMCMC(Y, I_0, obsTimes, N, beta, gamma, lambda0, V0,
-                                              noSims, noIts = 10000, burnIn = 0)
+                                              noSims = noSims, noIts = 10000, burnIn = 0)
     lambda = adaptRun$lambda
     V = adaptRun$V
   } else{
