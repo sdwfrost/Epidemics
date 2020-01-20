@@ -1,4 +1,4 @@
-#' Importance Sampling with known epidemic parameters
+#' Importance Sampling with known epidemic parameters (SIR)
 
 #' Epidemic process {x_t ; t \in (0, T)}
 #' T is the end of the epidemic
@@ -58,45 +58,115 @@
 #' not really informed by the data
 #' = (Can we bias simulation of particle x^{i} according to y?) =
 
-epidemicImportanceSampler <- function(panelData, obsTimes, theta, Nparticles){
+epidemicImportanceSampler <- function(transData, N, a, obsTimes, theta, Nparticles){
 
-  #' 1. Simulate N particles $x^{i}$ \sim q() (This is a particle)
+  start = as.numeric(Sys.time())
+  # 1. Simulate N particles $x^{i}$ \sim q() (This is a particle)
+  m = sum(transData[[1]])
 
-
-  m = length(panelData[[1]][,2])
-
-  particles = lapply(X = 1:N_p, function(X){
-    SIR_Gillespie(N, initial_state = c(rep(1, N - a), rep(2, a)), beta = theta[1], gamma = theta[2], output = "panel",
-                  obs_times = obs_times, obs_end = tail(obs_times, n = 1))$panel_data
+  particles = lapply(X = 1:Nparticles, function(X){
+    homogeneousPanelDataSIR_Gillespie(initialState = c(rep(1, N - a), rep(2, a)), beta = theta[1], gamma = theta[2],
+                  obsTimes = obsTimes)$panelData
   })
 
+  # 2. Calculate Likelihood (which is the main component of the weights)
+  # extract transition data from particles
+  particleTrans = lapply(particles, transitionData, states = 1:3)
+  if(length(obsTimes) > 2){
+    YgivenX = sapply(X = particleTrans, function(X) prod(mapply(extraDistr::dmvhyper, transData, X, MoreArgs = list(k = m))))
+    } else{
+      YgivenX = sapply(X = particleTrans, function(X) extraDistr::dmvhyper(transData[[1]], X[[1]], k = m))
+    }
 
+  # 3. Calculate Normalised weights
+  ISweights = YgivenX/sum(YgivenX)
 
-  #' 2. Calculate Likelihood (which is the main component of the weights)
-
-  if(homogen){
-    #' extract panel data from particles
-    particle_trans = lapply(particles, transition_data)
-    if(length(obs_times) > 2){
-      y_given_x = sapply(X = particle_trans, function(X) prod(mapply(extraDistr::dmvhyper, y, X, MoreArgs = list(k = m))))
-     }else{
-       y_given_x = sapply(X = particle_trans, function(X) extraDistr::dmvhyper(y[[1]], X[[1]], k = m))
-     }
-  }
-
-  #' 3. Calculate Normalised weights \tilde{\omega}(x^{i})
-  ISweights = y_given_x/sum(y_given_x)
+  # 4. Resample
+  resample = sample(1:Nparticles, prob = ISweights, replace = T)
+  particles = particles[resample]
+  #ISweights = ISweights[resample]
 
   ESS = 1/sum(ISweights^2)
-
-
-  return(list(ESS = ESS, ISweights = ISweights, particles = particles, y = y))
+  timeTaken = as.numeric(Sys.time()) - start
+  ESS.sec = ESS/timeTaken
+  return(list(ESS = ESS, ESS.sec = ESS.sec, ISweights = ISweights, particles = particles, transData = transData,
+              timeTaken = timeTaken))
 
 
   #' 4. Use this weighted sample to estimate integrals involving
   #'    posterior distribution.
 
 
+}
+
+sequentialImportanceSampler = function(transData, N, a, obsTimes, theta, Nparticles){
+
+  # empty vector for components of marginal estimate
+  marg = c()
+
+  # Timestep 1, simulation of N particles
+  start = as.numeric(Sys.time())
+  m = sum(transData[[1]])
+  # Simulate
+  particles = lapply(X = 1:Nparticles, function(X){
+    homogeneousPanelDataSIR_Gillespie(initialState = c(rep(1, N - a), rep(2, a)), beta = theta[1], gamma = theta[2],
+                                      obsTimes = obsTimes[1:2])$panelData
+  })
+
+  # Calculate Transition data and conditional observation densities
+  particleTrans = lapply(particles, transitionData, states = 1:3)
+
+  ISweights = sapply(X = particleTrans, function(X) extraDistr::dmvhyper(transData[[1]], X[[1]], k = m))
+
+  # 3. Calculate Normalised weights
+  ISweightsNorm = ISweights/sum(ISweights)
+
+  # 4. Resample
+  resample = sample(1:Nparticles, prob = ISweightsNorm, replace = T)
+  particles = particles[resample]
+
+  for(i in 2:(length(obsTimes) - 1)){
+    # 1. Simulate/Propogate Particles to the next panel observation time
+
+
+
+    # a) Use Gillespie simulation which outputs panel data, run between ith and (i+1)th
+    #    observation time.
+    nextObs = lapply(X = particles , function(X){
+      homogeneousPanelDataSIR_Gillespie(initialState = tail(X, n = 1)[[1]][,2], beta = theta[1], gamma = theta[2],
+                                        obsTimes = obsTimes[i:(i+1)])$panelData[[2]]
+    })
+    particles = lapply(X = 1:Nparticles, function(X){
+      particles[[X]][[i + 1]] = nextObs[[X]]
+      return(particles[[X]])
+    })
+
+    # 2. Calculate Normalised Weights
+    # a) Particle transition data
+    particleTrans = lapply(particles, transitionData, states = 1:3)
+
+    # b) Hypergeometric Calculation
+    ISweights = sapply(X = particleTrans, function(X) extraDistr::dmvhyper(transData[[i]], X[[i]], k = m))
+
+    # c) Normalise weights
+    ISweightsNorm = ISweights/sum(ISweights)
+
+    # 3. Estimate Marginal Density
+    marg[i] = mean(ISweights)
+
+    # 3. Resample
+    resample = sample(1:Nparticles, prob = ISweights, replace = T)
+    particles = particles[resample]
+    #ISweights = ISweights[resample]
+  }
+
+  margEst = prod(marg)
+  ESS = 1/sum(ISweights^2)
+
+  timeTaken = as.numeric(Sys.time()) - start
+  ESS.sec = ESS/timeTaken
+  return(list(ESS = ESS, ESS.sec = ESS.sec, particles = particles, ISweights = ISweights,
+              timeTaken = timeTaken))
 }
 
 
